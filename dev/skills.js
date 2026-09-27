@@ -41,6 +41,7 @@
     { id: 6, name: '冰川王冠', ultimateName: '冰川纪元', form: '自身增益', hotkey: '6', color: '#7ff0e6', range: 18, radius: 4.5, windup: 0.66, cooldown: 1.80, groundTarget: true },
     { id: 7, name: '疾风裂空', ultimateName: '龙卷裂隙', form: '位移', hotkey: '7', color: '#86ffd0', range: 15, radius: 3.8, windup: 0.46, cooldown: 1.25, groundTarget: false },
     { id: 8, name: '岩牙突刺', ultimateName: '群山崩塌', form: '直线近战', hotkey: '8', color: '#e0a86a', range: 12, radius: 3.9, windup: 0.58, cooldown: 1.15, groundTarget: false },
+    { id: 9, name: '王之财宝', ultimateName: '天地乖离', form: '剑雨投射', hotkey: '9', color: '#ffcf6b', range: 36, radius: 4.2, windup: 0.64, cooldown: 1.35, groundTarget: false },
   ];
 
   function profile(game, id, requestedLevel) {
@@ -260,7 +261,7 @@
       dark.scaling.set(this.radius * 1.95, this.radius * 1.95, 1);
       dark._spriteMat.setColor4('uColor', new C4(0.012, 0.016, 0.024, kind === 'ice' ? 0.22 : 0.65));
       this.dark = dark;
-      const KIND_TEX = { fire: 'meteorScar', ice: 'iceScar', electric: 'voltScar', earth: 'earthScar' };
+      const KIND_TEX = { fire: 'meteorScar', ice: 'iceScar', electric: 'voltScar', earth: 'earthScar', gold: 'goldScar' };
       const aiKey = KIND_TEX[kind] || null;
       const markTex = kind === 'wind' ? 'vortex' : kind === 'star' ? 'star'
         : (aiKey && FX.textures[aiKey] ? aiKey : 'fracture');
@@ -461,6 +462,36 @@
     const fins = owner.mesh('Box', { width: length * 0.27, height: length * 0.026, depth: length * 0.22 }, owner.edge, root);
     fins.position.z = -length * 0.22;
     return root;
+  }
+
+  /* 宝具剪影精灵:剑/枪贴图沿 +y 铺开(剑尖朝纹理顶),rollTo 让剑尖指向飞行方向且正面朝相机。 */
+  function weaponSprite(owner, tex, length) {
+    const mesh = owner.sprite('weaponBlade', tex, null);
+    mesh.scaling.set(length * 0.34, -length, 1);
+    return mesh;
+  }
+
+  /* 轴向公告板:+y 对准 dir,法线取相机方向在垂直于 dir 平面上的投影。 */
+  function rollTo(mesh, dir, camPos) {
+    const y = dir.normalize();
+    const toCam = camPos.subtract(mesh.position);
+    const d = toCam.x * y.x + toCam.y * y.y + toCam.z * y.z;
+    toCam.x -= y.x * d; toCam.y -= y.y * d; toCam.z -= y.z * d;
+    if (toCam.lengthSquared() < 1e-8) toCam.set(y.z || 1, 0, -y.x);
+    toCam.normalize();
+    const x = V3.Cross(y, toCam);
+    mesh.rotationQuaternion = BABYLON.Quaternion.FromRotationMatrix(
+      BABYLON.Matrix.FromValues(x.x, x.y, x.z, 0, y.x, y.y, y.z, 0, toCam.x, toCam.y, toCam.z, 0, 0, 0, 0, 1));
+  }
+
+  /* 宝库门扉:波纹贴图 + 边框环,平面法线沿 +z;root 由 aimNode 指向射向。 */
+  function gateNode(owner) {
+    const root = owner.group('treasureGate');
+    const ripple = owner.sprite('gateRipple', 'gate', root);
+    ripple.scaling.set(2.6, 2.6, 1);
+    const rim = owner.mesh('Torus', { diameter: 2.75, thickness: 0.075, tessellation: 28 }, owner.edge, root);
+    rim.rotation.x = Math.PI / 2;
+    return { root, ripple, rim };
   }
 
   /* 1 · 冰枪风暴：单矛 → 三矛 → 环绕矛 → 冰枪领域 → 空中枪阵轮番钉地。 */
@@ -1000,8 +1031,218 @@
     }
   }
 
+  /* 9 · 王之财宝:金色门扉开启宝库。
+     一至三级:门阵 + 单轮剑雨;四级:宝库穹顶 + 天穹法印(旧五级形态,乖离剑按反馈移除)。
+     五级宝库全开:玩家脚底超大召唤法阵 + 头顶十二门,每门五剑、0.5 秒一轮共五轮 2.5 秒,
+     落点为玩家选中处(底部不配法阵),命中后钉地再归还宝库。 */
+  class GateTreasuryCast extends Cast {
+    buildSpell() {
+      this.gates = [];
+      this.shots = [];
+      this.volleyT = 0;
+      const overhead = this.level === 5;
+      const nearCaster = this.level <= 2;
+      const n = [1, 3, 6, 14, 12][this.level - 1];
+      for (let i = 0; i < n; i++) {
+        const gate = gateNode(this);
+        const rec = {
+          root: gate.root, ripple: gate.ripple, rim: gate.rim,
+          a: i * TAU / n + (i % 2) * 0.16, ring: i % 2, heading: new V3(),
+        };
+        this.gates.push(rec);
+        if (nearCaster) {
+          const spread = n === 1 ? 0 : (i - (n - 1) / 2) * 0.85;
+          rec.root.position.copyFrom(this.startGround.add(this.dir.scale(1.5)).addInPlace(this.side.scale(spread)));
+          rec.root.position.y = 1.95 + (n === 3 && i === 1 ? 0.55 : 0);
+          const aimAt = this.target.add(this.side.scale(spread * 1.7));
+          aimAt.subtractToRef(rec.root.position, rec.heading); rec.heading.normalize();
+        } else if (overhead) {
+          rec.root.position.copyFrom(positionAt(this.startGround, 4.6 * this.p.size, rec.a, 7.4 + (i % 2) * 0.8));
+          this.target.subtractToRef(rec.root.position, rec.heading); rec.heading.normalize();
+        } else {
+          const ringR = this.p.radius * (rec.ring ? 1.05 : 1.5) * (this.level === 4 ? 1.15 : 1);
+          rec.root.position.copyFrom(positionAt(this.target, ringR, rec.a, (rec.ring ? 5.6 : 3.8) + this.level * 0.5));
+          this.target.subtractToRef(rec.root.position, rec.heading); rec.heading.normalize();
+        }
+        aimNode(rec.root, rec.heading);
+      }
+      /* 飞剑:1–4 级每门一把错峰齐射;五级每门五把,五轮 × 0.5 秒,轮内再错峰 */
+      const rounds = overhead ? 5 : 1;
+      const T = (nearCaster ? 0.5 : 0.8) + this.level * 0.12 + (nearCaster ? this.aimDist / 40 : 0.2);
+      for (let r = 0; r < rounds; r++) {
+        for (let i = 0; i < n; i++) {
+          const gate = this.gates[i];
+          const len = (i % 2 ? 2.2 : 2.3) * (this.level === 4 && i === 0 ? 1.35 : 1);
+          const sword = weaponSprite(this, i % 2 ? 'spearBlade' : 'blade', len);
+          const streak = this.sprite('bladeStreak', 'beamGlow', null);
+          streak.setEnabled(false);
+          const delayFrac = nearCaster ? i * 0.10 : (i % 4) * 0.12 + i * 0.026;
+          const er = overhead ? this.p.radius * (0.10 + (i % 4) * 0.06) : this.p.radius * (0.18 + (i % 4) * 0.20);
+          this.shots.push({
+            gate, sword, streak, len, round: r,
+            start: new V3(),
+            end: positionAt(this.target, er, overhead ? i * 2.399 + r * 1.71 : gate.a * 1.7 + 0.35, 0.5),
+            flyDir: new V3(),
+            launchAt: overhead ? r * 0.5 + (i / n) * 0.5 : delayFrac * T,
+            flightDur: overhead ? 0.42 + this.aimDist * 0.01 : (1 - delayFrac) * T,
+            landed: false,
+          });
+        }
+      }
+      this.volleyEnd = this.shots.reduce((m, s) => Math.max(m, s.launchAt + s.flightDur), 0);
+      this.travelDuration = this.volleyEnd;
+      if (this.level === 3 || this.level === 4) {
+        this.skySeal = new Rune(this, this.target.add(new V3(0, this.level === 4 ? 11.5 : 8, 0)), this.level, 'rune');
+      }
+      if (overhead) {
+        this.grandSeal = this.sprite('grandSeal', 'grandCircle', null, true);
+        this.grandSeal.position.copyFrom(this.startGround);
+        this.grandSeal.position.y = 0.055;
+      }
+      this.preview(0, 0);
+    }
+    /* 五级脚底巨型法阵取代常规施法/落点法阵,底部不配落点圈。 */
+    updateRituals() {
+      if (this.level !== 5) { super.updateRituals(); return; }
+      const windup = this.phase === 'windup';
+      const k = windup ? smooth(this.phaseT / this.windupDur) : 1;
+      if (windup) {
+        const hand = this.game.mage.worldHand ? this.game.mage.worldHand() : this.origin;
+        this.origin.copyFrom(hand); this.orb.position.copyFrom(hand);
+        const s = (0.3 + 0.75 * k) * Math.sqrt(this.p.size);
+        this.orb.scaling.set(s, s, 1); this.orb.rotation.z = this.total * 2.8;
+        this.spriteColor(this.orb, 0.30 + 0.35 * k, 1.1);
+      } else {
+        this.spriteColor(this.orb, this.phase === 'release' ? 0.5 * (1 - this.phaseProgress()) : 0, 1.2);
+      }
+    }
+    preview(dt, k) {
+      for (let i = 0; i < this.gates.length; i++) {
+        const rec = this.gates[i];
+        const open = smooth(sat((k - (i % 3) * 0.07) * 1.7));
+        if (this.level === 3 || this.level === 4) {
+          const a = rec.a + this.total * 0.22;
+          const ringR = this.p.radius * (rec.ring ? 1.05 : 1.5) * (this.level === 4 ? 1.15 : 1);
+          rec.root.position.copyFrom(positionAt(this.target, ringR, a, (rec.ring ? 5.6 : 3.8) + this.level * 0.5));
+          this.target.subtractToRef(rec.root.position, rec.heading); rec.heading.normalize();
+          aimNode(rec.root, rec.heading);
+        } else if (this.level === 5) {
+          const a = rec.a + this.total * 0.16;
+          rec.root.position.copyFrom(positionAt(this.startGround, 4.6 * this.p.size, a, 7.4 + (i % 2) * 0.8));
+          this.target.subtractToRef(rec.root.position, rec.heading); rec.heading.normalize();
+          aimNode(rec.root, rec.heading);
+        }
+        rec.root.scaling.setAll(this.p.size * (0.22 + 0.78 * open));
+        fadeGroup(rec.root, 0.16 + 0.84 * open);
+        this.spriteColor(rec.ripple, (0.18 + 0.72 * open) * (0.86 + 0.14 * Math.sin(this.total * 5.5 + i * 1.7)), 1.15);
+        rec.ripple.rotation.z = this.total * 0.35 * (i % 2 ? -1 : 1);
+      }
+      for (const s of this.shots) {
+        const open = smooth(sat((k - s.round * 0.05) * 1.7));
+        const sw = this.p.size * (0.3 + 0.7 * open);
+        s.sword.scaling.set(s.len * 0.34 * sw, -s.len * sw, 1);
+        s.sword.position.copyFrom(s.gate.root.position).addInPlace(s.gate.heading.scale((0.42 - s.round * 0.22) * this.p.size));
+        rollTo(s.sword, s.gate.heading, this.game.camera.position);
+        this.spriteColor(s.sword, 0.12 + 0.88 * open, 1.05);
+        s.streak.setEnabled(false);
+      }
+      if (this.skySeal) this.skySeal.update(-this.total, this.p.radius * 0.85, k * 0.55);
+      if (this.grandSeal) {
+        const grow = 0.25 + 0.75 * smooth(k);
+        this.grandSeal.scaling.set(19 * this.p.size * grow, 19 * this.p.size * grow, 1);
+        this.grandSeal.rotation.z = this.total * 0.10;
+        this.spriteColor(this.grandSeal, (0.18 + 0.55 * k) * (0.9 + 0.1 * Math.sin(this.total * 2.2)), 1.1);
+      }
+    }
+    onRelease() {
+      for (const s of this.shots) {
+        s.start.copyFrom(s.gate.root.position).addInPlace(s.gate.heading.scale((0.42 - s.round * 0.22) * this.p.size));
+        s.landed = false;
+      }
+    }
+    travel(dt) {
+      this.volleyT += dt * this.p.speed;
+      for (let i = 0; i < this.shots.length; i++) {
+        const s = this.shots[i];
+        const u = sat((this.volleyT - s.launchAt) / s.flightDur);
+        if (u <= 0) continue;
+        if (u < 1) {
+          V3.LerpToRef(s.start, s.end, u * u, s.sword.position);
+          if (this.level < 4) s.sword.position.y += Math.sin(u * Math.PI) * (0.5 + this.level * 0.3);
+          s.end.subtractToRef(s.start, s.flyDir); s.flyDir.normalize();
+          rollTo(s.sword, s.flyDir, this.game.camera.position);
+          s.sword.scaling.set(s.len * 0.34 * this.p.size, -s.len * this.p.size, 1);
+          this.spriteColor(s.sword, 1, 1.05);
+          s.streak.setEnabled(true);
+          stretchBeam(s.streak, s.sword.position.add(s.flyDir.scale(-s.len * this.p.size * 0.8)),
+            s.sword.position, this.p.size * 0.10);
+          this.spriteColor(s.streak, 0.32 + 0.16 * Math.sin(this.total * 20 + i * 1.3), 1.25);
+          this.emit(this.main, dt * 10, s.sword.position, radialVel(0.7, 0.3));
+          this.emit(this.detail, dt * 6, s.sword.position, radialVel(1.5, 0.5));
+        } else {
+          s.streak.setEnabled(false);
+          if (!s.landed) {
+            s.landed = true;
+            s.sword.position.copyFrom(s.end);
+            s.end.subtractToRef(s.start, s.flyDir); s.flyDir.normalize();
+            rollTo(s.sword, s.flyDir, this.game.camera.position);
+            s.sword.scaling.set(s.len * 0.34 * this.p.size, -s.len * this.p.size, 1);
+            this.spriteColor(s.sword, 1, 1.05);
+            this.emit(this.main, 4, s.end, radialVel(1.2, 0.7), true);
+            this.emit(this.detail, 6 + this.level, s.end, radialVel(2.6, 1.6), true);
+          }
+        }
+      }
+      if (this.skySeal) this.skySeal.update(-this.total, this.p.radius * 0.85, 0.55 * (1 - sat(this.volleyT / this.travelDuration)));
+      if (this.grandSeal) {
+        this.grandSeal.rotation.z = this.total * 0.12;
+        this.spriteColor(this.grandSeal, 0.68 + 0.06 * Math.sin(this.total * 2.2), 1.1);
+      }
+      return this.volleyT >= this.volleyEnd;
+    }
+    onImpact() {
+      this.residue('gold');
+    }
+    impactSpell(dt, k) {
+      for (const s of this.shots) {
+        if (s.landed) s.sword.position.y = 0.5 - k * 0.16;
+        s.streak.setEnabled(false);
+        this.spriteColor(s.sword, 1, 1.05);
+      }
+      if (this.grandSeal) {
+        this.grandSeal.rotation.z += dt * 0.35;
+        this.spriteColor(this.grandSeal, 0.68 * (1 - k * 0.5), 1.1);
+      }
+      if (Math.floor((this.total - dt) * 3) !== Math.floor(this.total * 3)) {
+        this.shock(this.p.radius * 0.55, 0.55, 0.3);
+      }
+      this.emit(this.smoke, dt * 10, this.target, radialVel(1.4, 0.9));
+    }
+    onAftermath() {
+    }
+    aftermathSpell(dt, k) {
+      const gateOut = 1 - smooth(k / 0.6);
+      for (let i = 0; i < this.gates.length; i++) {
+        const rec = this.gates[i];
+        fadeGroup(rec.root, gateOut);
+        this.spriteColor(rec.ripple, gateOut * (0.86 + 0.14 * Math.sin(this.total * 5 + i)), 1.1);
+      }
+      const swordOut = 1 - smooth((k - 0.3) / 0.7);
+      for (const s of this.shots) {
+        this.spriteColor(s.sword, swordOut, 1.05);
+        if (s.landed) s.sword.position.y = 0.34 - k * 0.22;
+      }
+      if (this.grandSeal) {
+        this.grandSeal.rotation.z += dt * 0.18;
+        this.spriteColor(this.grandSeal, 0.68 * (1 - smooth(k)), 1.1);
+      }
+      if (this.skySeal) this.skySeal.update(-this.total, this.p.radius * 0.85, 0.5 * (1 - k));
+      this.emit(this.detail, dt * 9 * (1 - k), this.target, radialVel(1.6, 0.8));
+    }
+  }
+
   const CAST_CLASSES = { 1: FrostSpearCast, 2: ThunderLanceCast, 3: MeteorCast, 4: StarBeamCast,
-    5: VoltBastionCast, 6: GlacialCrownCast, 7: WindRipCast, 8: RockFangCast };
+    5: VoltBastionCast, 6: GlacialCrownCast, 7: WindRipCast, 8: RockFangCast, 9: GateTreasuryCast };
   const SKILLS = {
     defs: DEFS, LEVELS, profile, phaseLabel: PHASE_LABEL,
     casts: [], transients: [], cooldowns: {}, cooldownTotals: {}, _particlesLeft: 480,

@@ -101,6 +101,15 @@
           ctx.fill();
         }
         break;
+      case 9: /* 王之财宝:金色门扉波纹 + 飞剑 */
+        ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.arc(0, -4, 19, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, -4, 12.5, Math.PI * 0.18, Math.PI * 0.82); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 22); ctx.lineTo(0, -12); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(-4.5, -12); ctx.lineTo(4.5, -12); ctx.closePath(); ctx.fill();
+        ctx.lineWidth = 3.2;
+        ctx.beginPath(); ctx.moveTo(-9, -9); ctx.lineTo(9, -9); ctx.stroke();
+        break;
     }
     ctx.restore();
   }
@@ -436,7 +445,7 @@
       this.selectedId = 0;
       for (const s of this.slots) { s.slot.classList.remove('sel'); s.slot.setAttribute('aria-pressed', 'false'); }
       document.getElementById('hud-skill').textContent = '选择你的法术';
-      document.getElementById('skill-origin').textContent = '按 1–8 或点击技能卡';
+      document.getElementById('skill-origin').textContent = '按 1–9 或点击技能卡';
       document.getElementById('skill-brief').textContent = '已释放的法术将继续完成。';
       document.getElementById('cast-label').textContent = '选择技能';
     },
@@ -459,7 +468,7 @@
       const disabled = !this.selectedId || left > 0;
       const castBtn = document.getElementById('btn-cast');
       if (castBtn.disabled !== disabled) castBtn.disabled = disabled;
-      const meta = !this.selectedId ? '1–8 / 选择' : left > 0 ? left.toFixed(1) + ' s / 恢复中' : 'LV.' + this.game.params.skills[this.selectedId].level + ' / SPACE';
+      const meta = !this.selectedId ? '1–9 / 选择' : left > 0 ? left.toFixed(1) + ' s / 恢复中' : 'LV.' + this.game.params.skills[this.selectedId].level + ' / SPACE';
       if (meta !== this._meta) { document.getElementById('cast-meta').textContent = meta; this._meta = meta; }
       const demo = this.game.demoTimer >= 0;
       if (demo !== this._demo) {

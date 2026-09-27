@@ -113,7 +113,7 @@
   .phase-step.active { border-color: var(--cyan); color: #c3e0df; }
   #phase-source { margin-top: 10px; min-height: 14px; color: var(--quiet); font-size: 9px; letter-spacing: .6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* The bottom deck has two distinct scales: spell level above, 1–8 keys below. */
+  /* The bottom deck has two distinct scales: spell level above, 1–9 keys below. */
   #spell-dock {
     position: fixed; left: calc((100% - var(--editor-rail)) / 2); bottom: var(--safe-bottom);
     transform: translateX(-50%); width: min(1080px, calc(100% - var(--editor-rail) - 48px));
@@ -436,11 +436,11 @@
         <p class="cast-hint">按钮向前方安全落点释放 · 鼠标可自由瞄准</p>
       </div>
     </div>
-    <div id="skillbar" role="group" aria-label="八种技能，数字键 1 到 8 选择"></div>
+    <div id="skillbar" role="group" aria-label="九种技能，数字键 1 到 9 选择"></div>
     <div class="dock-foot">
-      <span class="deck-label">ELEMENTAL ARSENAL / 08</span>
+      <span class="deck-label">ELEMENTAL ARSENAL / 09</span>
       <div class="key-hints" aria-label="快捷操作">
-        <span><kbd>1–8</kbd> 技能</span><span><kbd>WASD</kbd> 移动</span><span><kbd>鼠标左键</kbd> 释放</span><span><kbd>ESC / 右键</kbd> 取消</span><span class="optional-hint"><kbd>滚轮</kbd> 缩放</span>
+        <span><kbd>1–9</kbd> 技能</span><span><kbd>WASD</kbd> 移动</span><span><kbd>鼠标左键</kbd> 释放</span><span><kbd>ESC / 右键</kbd> 取消</span><span class="optional-hint"><kbd>滚轮</kbd> 缩放</span>
       </div>
     </div>
   </section>
@@ -460,7 +460,7 @@
   </aside>
 
   <section id="help-card" class="glass" aria-label="操作说明" hidden>
-    <h2>驾驭八种元素</h2>
+    <h2>驾驭九种秘仪</h2>
     <div class="row"><kbd class="k">1 – 8</kbd><span class="d">切换技能，不是法术等级</span></div>
     <div class="row"><kbd class="k">[ / ]</kbd><span class="d">切换 LV.1–5，五阶解锁大法术</span></div>
     <div class="row"><kbd class="k">W A S D</kbd><span class="d">移动施法者</span></div>

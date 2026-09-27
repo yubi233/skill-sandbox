@@ -69,6 +69,7 @@
         6: { color: '#7ff0e6', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
         7: { color: '#86ffd0', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
         8: { color: '#e0a86a', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
+        9: { color: '#ffcf6b', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
       },
     };
   }

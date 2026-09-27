@@ -303,6 +303,62 @@
       }
       ctx.putImageData(img, 0, 0);
     },
+    /* 宝具剑刃剪影:剑尖朝上(无贴图时的程序化回退,游戏内被 assets/blade.png 原位升级) */
+    blade(ctx, s) {
+      ctx.clearRect(0, 0, s, s);
+      const w = s * 0.5;
+      ctx.fillStyle = 'rgba(255,255,255,0.96)';
+      ctx.beginPath();
+      ctx.moveTo(w, s * 0.04);
+      ctx.lineTo(w + s * 0.075, s * 0.20);
+      ctx.lineTo(w + s * 0.075, s * 0.62);
+      ctx.lineTo(w - s * 0.075, s * 0.62);
+      ctx.lineTo(w - s * 0.075, s * 0.20);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillRect(w - s * 0.012, s * 0.12, s * 0.024, s * 0.5);
+      ctx.fillStyle = 'rgba(255,255,255,0.96)';
+      ctx.beginPath();
+      ctx.moveTo(w - s * 0.17, s * 0.615);
+      ctx.quadraticCurveTo(w, s * 0.70, w + s * 0.17, s * 0.615);
+      ctx.lineTo(w + s * 0.17, s * 0.685);
+      ctx.quadraticCurveTo(w, s * 0.735, w - s * 0.17, s * 0.685);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(w - s * 0.035, s * 0.69, s * 0.07, s * 0.22);
+      ctx.beginPath();
+      ctx.arc(w, s * 0.935, s * 0.055, 0, Math.PI * 2);
+      ctx.fill();
+    },
+    /* 宝具长枪剪影:菱形枪尖朝上(无贴图时的程序化回退) */
+    spearBlade(ctx, s) {
+      ctx.clearRect(0, 0, s, s);
+      const w = s * 0.5;
+      ctx.fillStyle = 'rgba(255,255,255,0.96)';
+      ctx.beginPath();
+      ctx.moveTo(w, s * 0.04);
+      ctx.lineTo(w + s * 0.085, s * 0.24);
+      ctx.lineTo(w, s * 0.44);
+      ctx.lineTo(w - s * 0.085, s * 0.24);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(w - s * 0.085, s * 0.25);
+      ctx.lineTo(w - s * 0.15, s * 0.34);
+      ctx.lineTo(w - s * 0.05, s * 0.37);
+      ctx.closePath();
+      ctx.moveTo(w + s * 0.085, s * 0.25);
+      ctx.lineTo(w + s * 0.15, s * 0.34);
+      ctx.lineTo(w + s * 0.05, s * 0.37);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(w - s * 0.055, s * 0.44, s * 0.11, s * 0.05);
+      ctx.fillRect(w - s * 0.022, s * 0.49, s * 0.044, s * 0.47);
+      ctx.beginPath();
+      ctx.arc(w, s * 0.975, s * 0.035, 0, Math.PI * 2);
+      ctx.fill();
+    },
   };
 
   function makeTexture(scene, name, size, key) {
@@ -622,6 +678,9 @@
       for (const name of ['rune', 'fracture', 'star', 'vortex', 'crystal']) {
         this.textures[name] = makeTexture(scene, name, name === 'crystal' ? 128 : 512, name);
       }
+      this.textures.blade = makeTexture(scene, 'blade', 512, 'blade');
+      this.textures.spearBlade = makeTexture(scene, 'spearBlade', 512, 'spearBlade');
+      this.textures.grandCircle = makeTexture(scene, 'grandCircle', 512, 'rune');
 
       /* 内联素材贴图(dev/build.mjs 扫描 assets/*.png 注入 window.__TEX_PNG):
          无同名程序化版本时先建占位纹理,图像解码后原位改写同一张 DynamicTexture,

@@ -1,6 +1,6 @@
 /* ==========================================================================
    main.js — 输入、瞄准、演示与统一时间步
-   1–8 选择技能，[] 切换等级，空格向前释放，WASD 移动。
+   1–9 选择技能，[] 切换等级，空格向前释放，WASD 移动。
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -41,7 +41,7 @@
         return;
       }
       if (isEditing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key >= '1' && e.key <= '8') {
+      if (e.key >= '1' && e.key <= '9') {
         UI.select(Number(e.key));
         e.preventDefault();
         return;
@@ -126,7 +126,7 @@
 
     function tryCast(point) {
       const id = UI.selectedId;
-      if (!id) { UI.toast('先按 1–8 选择技能'); return false; }
+      if (!id) { UI.toast('先按 1–9 选择技能'); return false; }
       const def = SKILLS.defs.find(d => d.id === id);
       const profile = SKILLS.profile(game, id);
       if (!def || !profile) return false;
@@ -190,7 +190,7 @@
 
     game.demoTimer = -1;
     game.demoIndex = 0;
-    const demoOrder = [3, 2, 6, 4, 5, 1, 7, 8];
+    const demoOrder = [3, 2, 6, 4, 5, 1, 7, 8, 9];
     function updateDemo(dt) {
       if (game.demoTimer < 0) return;
       // 大法术完整收招后再接下一招，避免八种元素叠成白屏。

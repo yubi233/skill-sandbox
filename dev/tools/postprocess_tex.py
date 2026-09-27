@@ -24,11 +24,20 @@ def process(src, dst, corner_patch=True, symmetry=0, size=512):
     w, h = im.size
     arr = np.asarray(im).astype(np.float32)
 
-    # 1) 水印修复:旋转180°的左上角补丁覆盖右下角(占 30% 边长)
+    # 1) 水印修复:绕画布中心旋转 90° 取同半径带内容贴回右下角(占 30% 边长)。
+    #    径向构图的贴花,同半径带比 180° 对角内容更贴合,且水印随旋转转出取样区;
+    #    内缘(左/上)羽化消除方形接缝。水印贴着图边,羽化够不到它。
     if corner_patch:
         m = int(min(w, h) * 0.30)
-        patch = im.crop((0, 0, m, m)).rotate(180)
-        im.paste(patch, (w - m, h - m))
+        rot = im.rotate(90, resample=Image.BICUBIC, center=(w / 2, h / 2))
+        patch = rot.crop((w - m, h - m, w, h))
+        mask = np.ones((m, m), np.float32)
+        ramp = max(2, int(m * 0.22))
+        for i in range(ramp):
+            f = i / ramp
+            mask[i, :] = np.minimum(mask[i, :], f)
+            mask[:, i] = np.minimum(mask[:, i], f)
+        im.paste(patch, (w - m, h - m), Image.fromarray((mask * 255).astype(np.uint8), 'L'))
         arr = np.asarray(im).astype(np.float32)
 
     r, g, b, a = arr[..., 0], arr[..., 1], arr[..., 2], arr[..., 3]

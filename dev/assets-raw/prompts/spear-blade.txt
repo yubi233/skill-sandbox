@@ -1,0 +1,12 @@
+Slug: texture-sprite
+Asset use: 游戏宝库飞枪剪影贴图（竖直朝上的单把长枪/骑枪，加色混合精灵，会按技能色染色），生成后做白光alpha后处理
+Primary request: 画一把竖直向上的华丽长枪完整剪影：菱形枪头朝上严格居中，枪头带倒钩与红缨座环，长杆直至底部；单把枪占满竖直构图
+Style anchor: 王国宝库仪仗骑枪的发光线描实心版；纯白实心剪影为主，枪头内部细线勾勒分层
+Composition/framing: 竖直构图，枪尖距顶边 5%、杆尾距底边 5%，枪头最宽处约占画面 20%，水平严格居中；左右大面积纯黑
+Lighting/atmosphere: 剪影自发光，不画光源，不画投影
+Color: 纯白剪影，亮灰细部线，底色纯黑
+Material/texture: 平面剪影，无透视，无立体浮雕，不要辉光铺满
+Layout: none
+Text: none —— 任何位置不得出现文字、logo、水印
+Constraints: 纯黑底白枪 PNG，枪尖朝画面正上方，主体之外全黑；单把武器
+Avoid: 文字、logo、水印、边框、棋盘格、多把武器、倾斜武器、背景光斑、彩色

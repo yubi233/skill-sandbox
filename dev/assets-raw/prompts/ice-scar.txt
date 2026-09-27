@@ -1,0 +1,12 @@
+Slug: texture-sprite
+Asset use: 游戏冰系技能落地后的冰霜地面痕迹贴图（透明背景平面贴花），Babylon.js 加色混合精灵，生成后做白光alpha后处理
+Primary request: 画一张正俯视圆形冰霜冲击痕迹：中心是细密霜晶丛，向外放射的冰裂缝网络（裂纹细而脆），边缘是羽毛状冰华结晶逐渐稀疏消失，整体近圆形
+Style anchor: 玻璃质冰霜窗花叠碎冰裂纹；冷白到冰蓝渐变，边缘结晶半透明，线条干净
+Composition/framing: 正俯视，居中构图，主体占画面 90%，四边各留 5% 空边；右下角只放空的纯黑底，不放细节元素
+Lighting/atmosphere: 冰晶自发光，不画光源，不画投影
+Color: 纯黑底，冰晶从亮白渐变到淡蓝
+Material/texture: 平面贴图，无透视，无立体浮雕，不要烘焙阴影和高光，不要辉光铺满
+Layout: none
+Text: none —— 画面任何位置不要出现文字、标志、水印
+Constraints: 纯黑底 PNG，主体之外全黑；可直接用作游戏贴花
+Avoid: 文字、logo、水印、边框、棋盘格、白底、3D 立体冰块、模糊光斑泛滥、可读字母数字

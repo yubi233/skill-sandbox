@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080c10">
+<title>ARCANA · 元素技能实验室</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #080c10;
+    --panel: rgba(13, 19, 24, .84);
+    --line: rgba(191, 206, 212, .14);
+    --line-bright: rgba(210, 221, 222, .26);
+    --text: #e7ece9;
+    --muted: #8b9b9e;
+    --quiet: #607175;
+    --gold: #c8ad77;
+    --cyan: #87c8c5;
+    --skill-color: #ff9440;
+    --editor-rail: 0px;
+    --editor-space: 0px;
+    --dock-space: 224px;
+    --safe-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--ink); }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--text); -webkit-font-smoothing: antialiased; user-select: none;
+    background: radial-gradient(ellipse at 100% 0, #172026 0, #080c10 55%);
+  }
+  body.editor-open { --editor-rail: 320px; }
+  button, input, select { font: inherit; }
+  button { color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  button:disabled { cursor: not-allowed; }
+  button, input, summary { outline: none; }
+  button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--cyan); outline-offset: 3px;
+  }
+  button { touch-action: manipulation; }
+  button, h1, h2, p { margin: 0; }
+  [hidden] { display: none !important; }
+  kbd { font-family: inherit; font-variant-numeric: tabular-nums; }
+  #scene {
+    position: fixed; left: 0; top: 0; width: calc(100% - var(--editor-rail)); height: 100%;
+    display: block; outline: none; touch-action: none; cursor: crosshair;
+  }
+  #scene-shade {
+    position: fixed; inset: 0 var(--editor-rail) 0 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(5, 9, 12, .42), transparent 19%, transparent 72%, rgba(5, 9, 12, .38));
+  }
+  .glass {
+    background: var(--panel); border: 1px solid var(--line);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .16);
+  }
+  .eyebrow { font-size: 9px; font-weight: 500; letter-spacing: 2.4px; color: var(--quiet); }
+
+  /* A quiet masthead leaves the arena, not the telemetry, in focus. */
+  #masthead {
+    position: fixed; top: 0; left: 0; right: 0; height: 80px; padding: 0 28px;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    z-index: 25; pointer-events: none;
+  }
+  .brand { display: flex; align-items: center; gap: 13px; flex: 0 0 auto; }
+  .brand-mark {
+    width: 30px; height: 30px; border: 1px solid var(--gold); transform: rotate(45deg);
+    display: grid; place-items: center; position: relative;
+  }
+  .brand-mark::before { content: ''; width: 14px; height: 14px; border: 1px solid rgba(200, 173, 119, .45); }
+  .brand-mark::after { content: ''; position: absolute; width: 4px; height: 4px; background: var(--gold); }
+  .brand-name { font-size: 17px; font-weight: 500; letter-spacing: 5px; line-height: 1.25; }
+  .brand-sub { margin-top: 5px; color: var(--muted); font-size: 10px; letter-spacing: 2px; }
+  #hud { margin-right: auto; padding-left: 28px; border-left: 1px solid var(--line); }
+  .live-status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; letter-spacing: 1.2px; }
+  .live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 9px rgba(135, 200, 197, .3); }
+  .mast-actions { display: flex; gap: 8px; pointer-events: auto; }
+  .quiet-btn {
+    min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px;
+    background: rgba(11, 17, 21, .7); color: #b3c0c0; font-size: 11px; letter-spacing: .7px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .16s, border-color .16s;
+  }
+  .quiet-btn:hover { background: #1b252b; border-color: var(--line-bright); }
+  #btn-demo .demo-symbol { width: 6px; height: 8px; border-left: 6px solid var(--cyan); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+  #btn-demo[aria-pressed="true"] { color: var(--cyan); border-color: rgba(135, 200, 197, .4); }
+  #btn-demo[aria-pressed="true"] .demo-symbol { width: 6px; height: 6px; border: 0; background: var(--cyan); }
+
+  /* The selected spell: compact editorial hierarchy, no technical wall of text. */
+  #brief-card {
+    position: fixed; top: 112px; left: 28px; width: 274px; z-index: 15; pointer-events: none;
+  }
+  .brief-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 17px; }
+  #skill-index { font-size: 10px; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: var(--muted); }
+  #skill-badge {
+    border: 1px solid rgba(135, 200, 197, .25); border-radius: 2px; padding: 4px 7px;
+    color: var(--cyan); font-size: 9px; letter-spacing: 1.1px;
+  }
+  #skill-badge.ultimate { color: #dbc391; border-color: rgba(200, 173, 119, .42); background: rgba(200, 173, 119, .06); }
+  #hud-skill { font-size: clamp(23px, 2.1vw, 31px); line-height: 1.4; font-weight: 500; letter-spacing: 2px; overflow-wrap: anywhere; text-wrap: balance; }
+  #skill-origin { margin-top: 8px; font-size: 11px; color: var(--gold); letter-spacing: 1.3px; }
+  #skill-brief { margin-top: 17px; max-width: 258px; color: #94a4a7; font-size: 11px; line-height: 1.95; letter-spacing: .6px; }
+  #skill-stats { display: flex; gap: 20px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line); }
+  .spell-stat { display: flex; flex-direction: column; gap: 5px; font-size: 9px; color: var(--quiet); letter-spacing: 1px; }
+  .spell-stat strong { color: #b6c6c7; font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
+  #phase-console { margin-top: 27px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .phase-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 9px; color: var(--quiet); letter-spacing: 1.2px; }
+  #hud-phase { color: var(--cyan); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  #phase-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; list-style: none; padding: 0; margin: 12px 0 0; }
+  .phase-step { min-width: 0; padding-top: 8px; border-top: 2px solid rgba(135, 200, 197, .12); color: var(--quiet); font-size: 9px; letter-spacing: .8px; transition: border-color .2s, color .2s; }
+  .phase-step.done { border-color: rgba(135, 200, 197, .46); color: #8da5a6; }
+  .phase-step.active { border-color: var(--cyan); color: #c3e0df; }
+  #phase-source { margin-top: 10px; min-height: 14px; color: var(--quiet); font-size: 9px; letter-spacing: .6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* The bottom deck has two distinct scales: spell level above, 1–8 keys below. */
+  #spell-dock {
+    position: fixed; left: calc((100% - var(--editor-rail)) / 2); bottom: var(--safe-bottom);
+    transform: translateX(-50%); width: min(1080px, calc(100% - var(--editor-rail) - 48px));
+    padding: 15px 17px 10px; border-radius: 8px; z-index: 20;
+  }
+  .dock-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .72fr); gap: 28px; align-items: end; margin-bottom: 14px; }
+  .level-caption { display: flex; align-items: baseline; gap: 9px; margin-bottom: 8px; min-width: 0; }
+  .level-caption label { font-size: 10px; color: #c1cbca; letter-spacing: 1.1px; flex-shrink: 0; }
+  #level-description { color: var(--gold); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .level-keys { margin-left: auto; color: var(--quiet); font-size: 9px; white-space: nowrap; }
+  #levelbar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+  .level-step {
+    min-width: 0; min-height: 35px; border: 1px solid var(--line); border-radius: 3px;
+    display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 3px;
+    background: rgba(255, 255, 255, .015); color: var(--muted); transition: border-color .16s, background .16s;
+  }
+  .level-step:hover { border-color: var(--line-bright); }
+  .level-step .level-number { font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: .4px; }
+  .level-step .level-name { font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .7; }
+  .level-step[aria-pressed="true"] { background: rgba(135, 200, 197, .1); border-color: rgba(135, 200, 197, .6); color: #c7e2df; }
+  .level-step.ultimate[aria-pressed="true"] { background: rgba(200, 173, 119, .1); border-color: rgba(200, 173, 119, .66); color: #e4cca0; }
+  .cast-actions { min-width: 0; }
+  #btn-cast {
+    position: relative; width: 100%; height: 42px; padding: 0 16px; border-radius: 4px;
+    border: 1px solid #b3a17b; background: linear-gradient(105deg, #cbb789, #dcc9a0);
+    color: #19201f; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    box-shadow: 0 3px 19px rgba(200, 173, 119, .08); transition: filter .16s, transform .16s;
+  }
+  #btn-cast:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+  #btn-cast:active:not(:disabled) { transform: translateY(0); }
+  #btn-cast:disabled { background: #252d2e; border-color: var(--line); color: #8a9798; box-shadow: none; }
+  #cast-label { font-size: 13px; font-weight: 600; letter-spacing: 2px; }
+  #cast-meta { font-size: 9px; font-variant-numeric: tabular-nums; letter-spacing: 1px; white-space: nowrap; }
+  .cast-hint { margin-top: 6px; text-align: center; color: var(--quiet); font-size: 9px; letter-spacing: .4px; }
+  #skillbar { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 7px; }
+  .slot {
+    min-width: 0; height: 91px; padding: 6px 5px 7px; position: relative; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 4px; background: rgba(255, 255, 255, .018);
+    display: flex; flex-direction: column; align-items: center;
+    transition: border-color .16s, background .16s, transform .16s;
+  }
+  .slot:hover { border-color: var(--line-bright); background: rgba(255, 255, 255, .045); transform: translateY(-2px); }
+  .slot.sel { border-color: rgba(200, 173, 119, .76); background: linear-gradient(180deg, rgba(200, 173, 119, .11), rgba(200, 173, 119, .025)); }
+  .slot.sel::after { content: ''; position: absolute; bottom: 0; left: 30%; right: 30%; height: 2px; background: var(--gold); }
+  .slot .key { position: absolute; left: 7px; top: 5px; font-size: 10px; color: #c0cbc9; line-height: 13px; z-index: 2; }
+  .slot .slot-level { position: absolute; right: 5px; top: 6px; color: var(--quiet); font-size: 8px; line-height: 12px; z-index: 2; }
+  .slot .slot-level.ultimate { color: var(--gold); }
+  .slot img { width: 43px; height: 43px; display: block; margin-top: 2px; position: relative; z-index: 1; }
+  .slot .nm { width: 100%; margin-top: 3px; font-size: 10px; color: #bfcac9; letter-spacing: .6px; text-align: center; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; position: relative; z-index: 2; }
+  .slot.sel .nm { color: #e6d7b9; }
+  .slot .slot-status { position: relative; z-index: 2; margin-top: 4px; color: var(--quiet); font-size: 8px; line-height: 10px; letter-spacing: .9px; font-variant-numeric: tabular-nums; }
+  .slot.cooling .slot-status { color: var(--gold); }
+  .slot .cd { position: absolute; inset: 0; pointer-events: none; background: rgba(3, 7, 10, .58); transform-origin: bottom; transform: scaleY(0); z-index: 1; }
+  .dock-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; min-height: 21px; }
+  .deck-label { color: var(--quiet); font-size: 8px; letter-spacing: 1.7px; white-space: nowrap; }
+  .key-hints { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 16px; color: var(--quiet); font-size: 9px; line-height: 1.4; }
+  .key-hints span { white-space: nowrap; }
+  .key-hints kbd { color: #9fadb0; padding-right: 4px; font-size: 9px; letter-spacing: .3px; }
+
+  /* The sidebar occupies its own rail; it never floats over the spell's target. */
+  #editor {
+    position: fixed; top: 96px; right: 24px; bottom: var(--safe-bottom); width: 280px;
+    border-radius: 7px; z-index: 24; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  }
+  #editor.collapsed { bottom: auto; width: 144px; }
+  #editor.collapsed #editor-content { display: none; }
+  #editor-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px; flex-shrink: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  #editor.collapsed #editor-head { padding: 10px 11px; border-bottom: 0; }
+  .editor-title { font-size: 11px; letter-spacing: 1.5px; font-weight: 500; }
+  .editor-kicker { margin-top: 5px; font-size: 8px; letter-spacing: 1.8px; color: var(--quiet); }
+  #editor.collapsed .editor-kicker { display: none; }
+  #editor-toggle { border: 0; padding: 4px 0 4px 7px; background: transparent; color: var(--muted); font-size: 10px; flex-shrink: 0; }
+  #editor-toggle:hover { color: var(--text); }
+  #editor-content { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  #editor-body { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; min-height: 0; padding: 15px 13px; flex: 1; scrollbar-width: thin; scrollbar-color: #354247 transparent; }
+  #editor-body::-webkit-scrollbar { width: 4px; }
+  #editor-body::-webkit-scrollbar-thumb { border-radius: 4px; background: #354247; }
+  .editor-selection { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+  .editor-selection img { width: 34px; height: 34px; flex-shrink: 0; }
+  .editor-selection-copy { min-width: 0; }
+  .editor-selection-title { font-size: 12px; color: #d6dedb; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+  .editor-selection-level { margin-top: 5px; font-size: 9px; color: var(--gold); letter-spacing: .5px; }
+  .editor-note { padding: 9px 10px; margin: 0 0 14px; border-left: 1px solid rgba(200, 173, 119, .48); background: rgba(200, 173, 119, .035); font-size: 10px; line-height: 1.8; color: var(--muted); }
+  .editor-note strong { color: #c4cdca; font-weight: 400; }
+  .editor-empty { padding: 12px 0; font-size: 11px; line-height: 1.8; color: var(--muted); }
+  .editor-section-label { margin: 20px 0 10px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 9px; letter-spacing: 1.4px; color: var(--quiet); }
+  .ctl { margin: 13px 0; min-width: 0; }
+  .ctl .lbl { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: #97a7a9; font-size: 10px; letter-spacing: .4px; }
+  .ctl .val { flex-shrink: 0; color: #c3ccca; font-variant-numeric: tabular-nums; font-size: 10px; letter-spacing: .3px; }
+  .ctl input[type="range"] { display: block; width: 100%; height: 18px; margin: 5px 0 0; padding: 0; appearance: none; -webkit-appearance: none; cursor: pointer; background: transparent; }
+  .ctl input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: linear-gradient(90deg, #90b9b5 var(--range-fill, 50%), #2b363b var(--range-fill, 50%)); }
+  .ctl input[type="range"]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; margin-top: -4px; width: 10px; height: 10px; border-radius: 2px; border: 1px solid #b5d0ca; background: #a4c8c0; }
+  .ctl input[type="range"]::-moz-range-track { height: 2px; background: #2b363b; }
+  .ctl input[type="range"]::-moz-range-progress { height: 2px; background: #90b9b5; }
+  .ctl input[type="range"]::-moz-range-thumb { width: 9px; height: 9px; border-radius: 2px; border: 1px solid #b5d0ca; background: #a4c8c0; }
+  .color-ctl { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .color-ctl .lbl { flex: 1; }
+  .ctl input[type="color"] { flex-shrink: 0; width: 31px; height: 25px; border: 1px solid var(--line-bright); border-radius: 3px; background: transparent; padding: 3px; cursor: pointer; }
+  .ctl input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .ctl input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 1px; }
+  .ctl .chk { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--muted); }
+  .ctl .chk input { accent-color: var(--cyan); margin: 0; }
+  details.grp { border-top: 1px solid var(--line); }
+  details.grp > summary { list-style: none; cursor: pointer; padding: 12px 1px; color: #a8b7b7; font-size: 10px; letter-spacing: .8px; display: flex; align-items: center; gap: 8px; }
+  details.grp > summary::-webkit-details-marker { display: none; }
+  details.grp > summary .caret { width: 5px; height: 5px; border-right: 1px solid var(--quiet); border-bottom: 1px solid var(--quiet); transform: rotate(-45deg); transition: transform .16s; margin-right: 2px; }
+  details.grp[open] > summary .caret { transform: rotate(45deg); }
+  .grp-body { padding: 0 2px 3px; }
+  #editor-foot { padding: 12px 13px; flex-shrink: 0; border-top: 1px solid var(--line); }
+  #btn-reset { width: 100%; min-height: 30px; font-size: 10px; }
+  .telemetry { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; color: var(--quiet); font-size: 9px; letter-spacing: .5px; }
+  .telemetry b { color: #95a7a9; font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  #help-card { position: fixed; top: 75px; right: 28px; width: min(304px, calc(100% - 32px)); padding: 18px; z-index: 45; border-radius: 6px; }
+  #help-card h2 { font-size: 12px; font-weight: 500; color: #d5dfdc; letter-spacing: 1.5px; margin-bottom: 13px; }
+  #help-card .row { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; font-size: 10px; line-height: 1.6; }
+  #help-card .k { min-width: 73px; flex-shrink: 0; color: #b9cdc9; font-size: 10px; }
+  #help-card .d { color: var(--muted); }
+  #help-card .tip { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 10px; color: var(--quiet); line-height: 1.8; }
+  #toast {
+    position: fixed; top: 84px; left: calc((100% - var(--editor-rail)) / 2); transform: translate(-50%, -5px);
+    max-width: min(460px, calc(100% - 32px)); padding: 10px 17px; z-index: 50; border-radius: 4px;
+    background: rgba(15, 24, 28, .96); border: 1px solid rgba(135, 200, 197, .3);
+    font-size: 11px; line-height: 1.6; letter-spacing: .5px; color: #cfddda;
+    text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 1240px) and (min-width: 761px) {
+    body.editor-open #brief-card { width: 230px; }
+    body.editor-open #hud-skill { font-size: 23px; }
+    body.editor-open .level-name { display: none; }
+    body.editor-open .dock-toolbar { gap: 16px; }
+    body.editor-open .deck-label { display: none; }
+    body.editor-open .key-hints { justify-content: center; width: 100%; }
+  }
+  @media (max-width: 1100px) and (min-width: 761px) {
+    body.editor-open { --editor-rail: 296px; }
+    #editor { width: 260px; right: 18px; }
+    body.editor-open #brief-card { display: none; }
+    body.editor-open #skillbar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    body.editor-open .slot { height: 70px; }
+    body.editor-open .slot img { width: 30px; height: 30px; }
+    body.editor-open .dock-toolbar { grid-template-columns: minmax(0, 1fr) 180px; gap: 14px; }
+    body.editor-open .level-keys { display: none; }
+    body.editor-open .cast-hint { font-size: 8px; }
+  }
+  @media (max-width: 900px) {
+    #hud { display: none; }
+    #brief-card { width: 248px; }
+    #hud-skill { font-size: 25px; }
+    .level-name { display: none; }
+    .dock-toolbar { gap: 18px; }
+    .deck-label { display: none; }
+    .key-hints { width: 100%; justify-content: center; gap: 5px 13px; }
+  }
+  @media (max-width: 760px) {
+    :root { --safe-bottom: max(12px, env(safe-area-inset-bottom)); --dock-space: 282px; }
+    body.editor-open { --editor-rail: 0px; --editor-space: clamp(160px, 25dvh, 230px); }
+    #masthead { height: 67px; padding: 0 17px; gap: 8px; }
+    .brand { gap: 10px; }
+    .brand-mark { width: 23px; height: 23px; }
+    .brand-mark::before { width: 10px; height: 10px; }
+    .brand-name { font-size: 14px; letter-spacing: 3px; }
+    .brand-sub { font-size: 8px; letter-spacing: 1.3px; margin-top: 4px; }
+    .mast-actions { gap: 5px; }
+    .quiet-btn { padding: 0 9px; min-height: 31px; font-size: 10px; gap: 6px; }
+    #scene { top: 66px; width: 100%; height: max(40px, calc(100% - 66px - var(--dock-space) - var(--editor-space))); }
+    #scene-shade { display: none; }
+    #brief-card { left: 18px; top: 91px; width: calc(100% - 184px); max-width: 270px; }
+    .brief-heading { margin-bottom: 8px; gap: 7px; }
+    #skill-index { font-size: 8px; letter-spacing: 1px; }
+    #skill-badge { padding: 3px 5px; font-size: 8px; letter-spacing: .5px; }
+    #hud-skill { font-size: 21px; letter-spacing: 1px; line-height: 1.4; }
+    #skill-origin { font-size: 9px; margin-top: 5px; letter-spacing: .5px; }
+    #skill-brief { font-size: 10px; line-height: 1.75; margin-top: 9px; letter-spacing: .2px; }
+    #skill-stats, #phase-console { display: none; }
+    body.editor-open #brief-card { display: none; }
+    #spell-dock { left: 50%; width: calc(100% - 24px); padding: 12px 11px 8px; }
+    .dock-toolbar { grid-template-columns: minmax(0, 1fr) minmax(175px, .8fr); gap: 13px; margin-bottom: 10px; }
+    .level-caption { gap: 6px; margin-bottom: 7px; }
+    .level-caption label { font-size: 9px; }
+    .level-keys { display: none; }
+    .level-step { min-height: 33px; }
+    .level-step .level-number { font-size: 9px; }
+    #skillbar { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+    .slot { height: 70px; padding: 4px; }
+    .slot img { width: 31px; height: 31px; margin-top: 0; }
+    .slot .nm { font-size: 9px; margin-top: 2px; }
+    .slot .slot-status { font-size: 8px; margin-top: 3px; }
+    .slot .key { font-size: 9px; left: 6px; }
+    .slot .slot-level { font-size: 7px; }
+    #btn-cast { height: 37px; padding: 0 12px; }
+    #cast-label { font-size: 12px; letter-spacing: 1px; }
+    #cast-meta { font-size: 8px; letter-spacing: .4px; }
+    .cast-hint { font-size: 8px; margin-top: 5px; letter-spacing: 0; }
+    .dock-foot { padding-top: 8px; }
+    .key-hints { font-size: 8px; gap: 4px 10px; }
+    .key-hints kbd { font-size: 8px; padding-right: 3px; }
+    #editor {
+      top: auto; bottom: var(--dock-space); left: 12px; right: 12px; width: auto;
+      height: var(--editor-space); border-radius: 6px;
+    }
+    #editor.collapsed { left: auto; right: 15px; top: 84px; bottom: auto; width: 133px; height: auto; }
+    #editor-head { padding: 9px 12px; }
+    .editor-kicker { display: none; }
+    #editor-content { position: relative; }
+    #editor-body { padding: 11px 13px; }
+    #editor-foot { padding: 7px 12px; display: flex; align-items: center; gap: 14px; }
+    #btn-reset { width: auto; flex-shrink: 0; padding: 0 13px; min-height: 27px; }
+    .telemetry { margin: 0; flex: 1; font-size: 8px; gap: 5px; }
+    .editor-selection { margin-bottom: 8px; }
+    .editor-note { font-size: 9px; margin-bottom: 9px; }
+    #help-card { right: 16px; top: 62px; max-height: calc(100dvh - 82px); overflow-y: auto; }
+    #toast { left: 50%; top: 68px; font-size: 10px; }
+  }
+  @media (max-width: 520px) {
+    .dock-toolbar { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .level-keys { display: inline; }
+    .level-step { min-height: 31px; }
+    .level-step .level-name { display: inline; font-size: 8px; }
+    #btn-cast { height: 37px; }
+    .cast-hint { display: none; }
+    .key-hints { gap: 4px 10px; }
+    .optional-hint { display: none; }
+    #brief-card { width: calc(100% - 173px); }
+    #hud-skill { font-size: 19px; }
+    #skill-brief { display: none; }
+    .brand-sub { letter-spacing: .7px; }
+    #help-toggle { padding: 0 8px; }
+  }
+  @media (max-width: 360px) {
+    .brand-mark { display: none; }
+    .brand-name { font-size: 13px; }
+    .brand-sub { font-size: 8px; }
+    .level-step .level-name { display: none; }
+    .telemetry span:last-child { display: none; }
+    #skill-origin { font-size: 8px; }
+  }
+  @media (max-height: 690px) and (min-width: 761px) {
+    #masthead { height: 62px; }
+    #editor { top: 73px; }
+    #brief-card { top: 82px; }
+    #skill-brief, #skill-stats { display: none; }
+    #phase-console { margin-top: 17px; }
+    #scene { top: 60px; height: max(60px, calc(100% - 60px - var(--dock-space))); }
+    #brief-card { width: 212px; }
+    #hud-skill { font-size: 20px; }
+    #spell-dock { padding-top: 10px; }
+    .dock-toolbar { margin-bottom: 9px; }
+    .slot { height: 71px; }
+    .slot img { width: 30px; height: 30px; }
+  }
+  @media (max-height: 640px) and (max-width: 760px) {
+    body.editor-open { --editor-space: 145px; }
+    #brief-card { display: none; }
+    #spell-dock { padding: 8px 9px 6px; }
+    .dock-toolbar { gap: 7px; margin-bottom: 7px; }
+    .slot { height: 57px; }
+    .slot img { width: 23px; height: 23px; }
+    .slot .slot-status { margin-top: 1px; font-size: 7px; }
+    .slot .nm { font-size: 8px; }
+    .level-caption { margin-bottom: 4px; }
+    .level-step { min-height: 26px; }
+    #btn-cast { height: 31px; }
+    #editor-foot .telemetry { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="scene" aria-label="元素技能试炼场，使用 WASD 移动，鼠标瞄准施法"></canvas>
+  <div id="scene-shade" aria-hidden="true"></div>
+
+  <header id="masthead">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div><h1 class="brand-name">ARCANA</h1><p class="brand-sub">元素技能实验室</p></div>
+    </div>
+    <div id="hud"><div class="live-status"><span class="live-dot" aria-hidden="true"></span><span>黑曜试炼场 · 自由施法</span></div></div>
+    <nav class="mast-actions" aria-label="试炼场操作">
+      <button type="button" class="quiet-btn" id="btn-demo" aria-pressed="false"><span class="demo-symbol" aria-hidden="true"></span><span id="demo-label">自动演示</span></button>
+      <button type="button" class="quiet-btn" id="help-toggle" aria-controls="help-card" aria-expanded="false">操作说明</button>
+    </nav>
+  </header>
+
+  <section id="brief-card" aria-label="当前技能">
+    <div class="brief-heading"><span id="skill-index">SPELL / 03</span><span id="skill-badge" class="ultimate">LV.5 · 灾厄</span></div>
+    <h2 id="hud-skill">陨火天降</h2>
+    <p id="skill-origin">第五阶 · 大法术</p>
+    <p id="skill-brief">让陨火划破夜空，在选定落点引发毁灭性的爆发。</p>
+    <div id="skill-stats">
+      <div class="spell-stat"><span>施法距离</span><strong id="skill-range">—</strong></div>
+      <div class="spell-stat"><span>蓄力时间</span><strong id="skill-windup">—</strong></div>
+      <div class="spell-stat"><span>冷却时间</span><strong id="skill-cooldown">—</strong></div>
+    </div>
+    <div id="phase-console">
+      <div class="phase-caption"><span>施法进程</span><span id="hud-phase">待机</span></div>
+      <ol id="phase-track" aria-label="五阶段施法进程">
+        <li class="phase-step" data-phase="windup">聚能</li>
+        <li class="phase-step" data-phase="release">释放</li>
+        <li class="phase-step" data-phase="travel">行进</li>
+        <li class="phase-step" data-phase="impact">爆发</li>
+        <li class="phase-step" data-phase="aftermath">余辉</li>
+      </ol>
+      <p id="phase-source">选择落点，释放你的法术。</p>
+    </div>
+  </section>
+
+  <section id="spell-dock" class="glass" aria-label="技能与法术等级">
+    <div class="dock-toolbar">
+      <div class="level-config">
+        <div class="level-caption"><label id="level-label">法术等级</label><span id="level-description">第五阶 · 灾厄</span><span class="level-keys"><kbd>[</kbd> / <kbd>]</kbd> 切换等级</span></div>
+        <div id="levelbar" role="group" aria-labelledby="level-label"></div>
+      </div>
+      <div class="cast-actions">
+        <button type="button" id="btn-cast"><span id="cast-label">释放大法术</span><span id="cast-meta">LV.5 / 就绪</span></button>
+        <p class="cast-hint">按钮向前方安全落点释放 · 鼠标可自由瞄准</p>
+      </div>
+    </div>
+    <div id="skillbar" role="group" aria-label="八种技能，数字键 1 到 8 选择"></div>
+    <div class="dock-foot">
+      <span class="deck-label">ELEMENTAL ARSENAL / 08</span>
+      <div class="key-hints" aria-label="快捷操作">
+        <span><kbd>1–8</kbd> 技能</span><span><kbd>WASD</kbd> 移动</span><span><kbd>鼠标左键</kbd> 释放</span><span><kbd>ESC / 右键</kbd> 取消</span><span class="optional-hint"><kbd>滚轮</kbd> 缩放</span>
+      </div>
+    </div>
+  </section>
+
+  <aside id="editor" class="glass collapsed" aria-label="实时参数编辑器">
+    <div id="editor-head">
+      <div><h2 class="editor-title">实时参数</h2><p class="editor-kicker">SPELL CONFIGURATION</p></div>
+      <button type="button" id="editor-toggle" aria-controls="editor-content" aria-expanded="false">展开</button>
+    </div>
+    <div id="editor-content" hidden>
+      <div id="editor-body"></div>
+      <div id="editor-foot">
+        <button type="button" id="btn-reset" class="quiet-btn">恢复全部默认参数</button>
+        <div class="telemetry"><span><b id="hud-fps">—</b> FPS</span><span>粒子 <b id="hud-particles">0</b></span><span>本地实时预览</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <section id="help-card" class="glass" aria-label="操作说明" hidden>
+    <h2>驾驭八种元素</h2>
+    <div class="row"><kbd class="k">1 – 8</kbd><span class="d">切换技能，不是法术等级</span></div>
+    <div class="row"><kbd class="k">[ / ]</kbd><span class="d">切换 LV.1–5，五阶解锁大法术</span></div>
+    <div class="row"><kbd class="k">W A S D</kbd><span class="d">移动施法者</span></div>
+    <div class="row"><kbd class="k">鼠标左键</kbd><span class="d">向鼠标所指位置释放技能</span></div>
+    <div class="row"><kbd class="k">空格 / 释放按钮</kbd><span class="d">向前方安全可见位置释放</span></div>
+    <div class="row"><kbd class="k">右键 / ESC</kbd><span class="d">取消选择与未完成的施法</span></div>
+    <div class="row"><kbd class="k">右键拖动</kbd><span class="d">环绕观察施法者</span></div>
+    <div class="row"><kbd class="k">鼠标滚轮</kbd><span class="d">拉近或拉远视角</span></div>
+    <p class="tip">地面落点圈提示施法范围；超出射程时变色。每个技能的五个等级分别保留参数，切换等级不会改变已经释放的法术。</p>
+  </section>
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+/*__BABYLON__*/
+  </script>
+  <script>
+/*__APP__*/
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+Slug: texture-sprite
+Asset use: 游戏雷系技能落地后的雷击焦痕贴图（透明背景平面贴花），Babylon.js 加色混合精灵，生成后做白光alpha后处理
+Primary request: 画一张正俯视圆形雷击灼烧痕迹：中心是小型熔蚀坑，向外劈出多条闪电状分叉灼痕（主干粗、末梢细、分叉角度凌厉），边缘散布细小电蚀斑点，整体近圆形
+Style anchor: 雷击木炭化纹路叠加电路放电分叉；纯黑焦底上亮白偏紫的电蚀线自发光，分叉锐利
+Composition/framing: 正俯视，居中构图，主体占画面 90%，四边各留 5% 空边；右下角只放空的纯黑底，不放细节元素
+Lighting/atmosphere: 灼痕自发光，不画光源，不画投影
+Color: 纯黑底，电蚀线从亮白到淡紫渐变
+Material/texture: 平面贴图，无透视，无立体浮雕，不要烘焙阴影和高光，不要辉光铺满
+Layout: none
+Text: none —— 画面任何位置不要出现文字、标志、水印
+Constraints: 纯黑底 PNG，主体之外全黑；可直接用作游戏贴花
+Avoid: 文字、logo、水印、边框、棋盘格、白底、3D 立体感、模糊光斑泛滥、可读字母数字

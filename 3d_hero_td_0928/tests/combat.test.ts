@@ -32,13 +32,14 @@ test('pickFrontTarget：射程内 z 最小者胜，射程外排除', () => {
 });
 
 test('leadPoint：远段直奔防线时沿 z 轴提前，钳制在剩余路程内', () => {
-  // z=24 的敌人 2.6m/s 直奔 hero(z=-30)：实际距离 54m → 飞行 54/20，
-  // 延迟 = 0.42 + 0.16 + 2.7 = 3.28s → 提前 8.528m（远小于剩余 52m，不钳制）
+  // z=24 的敌人 2.6m/s 直奔 hero(z=-30)：实际距离 54m → 飞行 54/(20+2.6)，
+  // 延迟 = 0.42 + 0.16 + 2.3894 = 2.9694s → 提前 7.7204m（远小于剩余 52m，不钳制）
   const e = unit(0, 24);
   const p = leadPoint(e, TUNING, []);
   assert.ok(p);
   assert.equal(p!.x, 0, '直奔防线时 x 不变');
-  assert.ok(Math.abs(p!.z - (24 - 2.6 * (0.42 + RELEASE_DELAY + 54 / 20))) < 1e-9, '沿 z 提前');
+  const expected = 24 - 2.6 * (0.42 + RELEASE_DELAY + 54 / (TUNING.flightSpeed + 2.6));
+  assert.ok(Math.abs(p!.z - expected) < 1e-9, `沿 z 提前: ${p!.z} ≠ ${expected}`);
   // 距防线仅 1m 时：提前量钳制在 remaining-reach = 1-(1.7+0.3) = 负 → 0（原地）
   const close = unit(0, -29);
   const pc = leadPoint(close, TUNING, []);

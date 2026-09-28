@@ -8,7 +8,7 @@ import '../render/scene';
 import '../render/entities/units';
 import '../render/skills';
 import '../core/director';
-import '../../dev/ui.js';
+import '../render/ui';
 import '../../dev/main.js';
 
 // 阶段2桥接：为 TS 版 DIRECTOR 接线世界钩子（entities/skills 转换后改为直接引用）。

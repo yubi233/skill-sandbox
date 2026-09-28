@@ -4,8 +4,7 @@
 import './babylon-globals';
 import '../render/particles';
 import '../core/config';
-import '../../dev/core.js';
-import '../../dev/core.js';
+import '../render/scene';
 import '../../dev/entities.js';
 import '../../dev/skills.js';
 import '../../dev/director.js';

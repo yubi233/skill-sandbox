@@ -3,7 +3,8 @@
 // 阶段2逐文件转 TS 后本文件删除。
 import './babylon-globals';
 import '../render/particles';
-import '../../dev/config.js';
+import '../core/config';
+import '../../dev/core.js';
 import '../../dev/core.js';
 import '../../dev/entities.js';
 import '../../dev/skills.js';

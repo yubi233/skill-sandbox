@@ -6,6 +6,7 @@
    ========================================================================== */
 import * as BABYLON from '@babylonjs/core';
 import { FX, type FxSpriteMesh } from '../particles';
+import { CONFIG } from '../../core/config';
 import { nid } from './rigs';
 import { hitSpark } from './effects';
 import { Units, type Unit } from './units';
@@ -17,7 +18,7 @@ const C4 = BABYLON.Color4;
 
 type FxEmitter = InstanceType<typeof FX.Emitter>;
 
-const PROJECTILE_CAP = 96; // TODO(阶段3)：进 config
+const PROJECTILE_CAP = CONFIG.TUNING.projectileCap;   // 阶段3e：出处 CONFIG.TUNING // TODO(阶段3)：进 config
 
 /* 发射参数（Units.spawnProjectile 透传，技能系统经 window 桥共用） */
 export interface ProjectileSpawnOpts {

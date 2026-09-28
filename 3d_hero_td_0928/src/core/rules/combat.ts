@@ -74,10 +74,9 @@ export function pickFrontTarget(enemies: readonly CombatUnitView[], range: numbe
 
 /** 施法前摇 + 释放 + 飞行的总延迟常数（与法术阶段机一致）。 */
 export const RELEASE_DELAY = 0.16;
-/** 近段合围的判定线：enemy.z 越过 hero.z + FAR_SEGMENT 后直奔英雄。 */
-export const FAR_SEGMENT = 14;
-/** 直奔英雄时的额外判定余量。 */
-export const HERO_REACH_MARGIN = 0.3;
+/** 近段合围判定线 / 判定余量：出处 CONFIG.TUNING（阶段3e 收编散落魔法数）。 */
+export const farSegment = (): number => CONFIG.TUNING.farSegment;
+export const heroReachMargin = (): number => CONFIG.TUNING.heroReachMargin;
 
 /**
  * 移动目标提前量：预测敌人施法结算时的位置（朝当前接近目标方向），
@@ -103,12 +102,12 @@ export function leadPoint(
   const dx = toward.x - enemy.x;
   const dz = toward.z - enemy.z;
   const remaining = Math.hypot(dx, dz);
-  const reach = enemy.def.reach + (toward === hero ? HERO_REACH_MARGIN : 0);
+  const reach = enemy.def.reach + (toward === hero ? heroReachMargin() : 0);
   const speed = enemy.speedNow ? enemy.speedNow() : enemy.def.speed;
   const range = Math.hypot(enemy.x - hero.x, enemy.z - hero.z);
   const flight = tuning.flightSpeed > 0 ? range / (tuning.flightSpeed + speed) : 0;
   const travel = Math.min(Math.max(0, remaining - reach), speed * (tuning.windup + RELEASE_DELAY + flight));
-  if (toward === hero && enemy.z > hero.z + FAR_SEGMENT) return { x: enemy.x, z: enemy.z - travel };
+  if (toward === hero && enemy.z > hero.z + farSegment()) return { x: enemy.x, z: enemy.z - travel };
   const k = remaining > 0 ? travel / remaining : 0;
   return { x: enemy.x + dx * k, z: enemy.z + dz * k };
 }

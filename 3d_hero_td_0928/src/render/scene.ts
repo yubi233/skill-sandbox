@@ -160,7 +160,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       rallyMarks.push(pip);
     }
   }
-  for (const laneX of [-7, 0, 7]) {
+  for (const laneX of CONFIG.TUNING.laneX) {
     for (let i = 0; i < 6; i++) {
       const dash = BABYLON.MeshBuilder.CreateBox('laneDash', { width: 0.10, height: 0.02, depth: 2.2 }, scene);
       dash.position.set(laneX, 0.03, FIELD.rallyZ[1] + 6 + i * 6.2); dash.material = matRune;
@@ -254,13 +254,14 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   const mage = new Mage(scene);
   mage.root.position.set(HERO.position[0], 0, HERO.position[1]);
 
-  /* 相机：自英雄身后俯瞰北面战场 */
-  const camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, 0.58, 90, new V3(0, 1.5, -2), scene);
-  camera.lowerRadiusLimit = 72;
-  camera.upperRadiusLimit = 110;
+  /* 相机：自英雄身后俯瞰北面战场（参数出处 CONFIG.TUNING.camera，阶段3e） */
+  const CAM = CONFIG.TUNING.camera;
+  const camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, CAM.beta, CAM.radius, new V3(0, 1.5, CAM.targetZ), scene);
+  camera.lowerRadiusLimit = CAM.minRadius;
+  camera.upperRadiusLimit = CAM.maxRadius;
   camera.lowerBetaLimit = 0.44;
   camera.upperBetaLimit = 0.78;
-  camera.fov = 0.82;
+  camera.fov = CAM.fov;
   camera.minZ = 0.4;
   camera.maxZ = 320;
   camera.panningSensibility = 0;
@@ -272,18 +273,19 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   /* 清晰日光 + 只让白热核心泛光：阈值压低、权重适中，亮背景下光效靠
      分层光晕与暗衬底保对比（skills.js），曝光略收避免全场过曝。 */
+  const POST = CONFIG.TUNING.post;
   const post = new BABYLON.DefaultRenderingPipeline('post', true, scene, [camera]);
   post.fxaaEnabled = true;
   post.bloomEnabled = true;
-  post.bloomThreshold = 0.9;
-  post.bloomWeight = 0.3;
+  post.bloomThreshold = POST.bloomThreshold;
+  post.bloomWeight = POST.bloomWeight;
   post.bloomKernel = 32;
   post.bloomScale = 0.5;
   post.imageProcessingEnabled = true;
   post.imageProcessing.toneMappingEnabled = true;
   post.imageProcessing.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
-  post.imageProcessing.exposure = 0.93;
-  post.imageProcessing.contrast = 1.05;
+  post.imageProcessing.exposure = POST.exposure;
+  post.imageProcessing.contrast = POST.contrast;
   /* 本版本 DefaultRenderingPipeline 无 vignetteEnabled 存取器；原 JS 此行运行时为无害赋值，原样保留 */
   (post as unknown as { vignetteEnabled: boolean }).vignetteEnabled = false;
   post.grainEnabled = false;

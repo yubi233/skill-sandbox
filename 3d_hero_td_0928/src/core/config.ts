@@ -577,7 +577,9 @@ function validate(): string[] {
   for (const b of BOSS_ROTATION) {
     if (!enemyOf(b) || !enemyOf(b)?.boss) problems.push('BOSS_ROTATION 引用非 Boss 敌人: ' + b);
   }
-  for (const k of ['halfWidth', 'spawnZ', 'intermission', 'startGold'] as const) {
+  if (!(TUNING.aggro > 0 && TUNING.projectileCap > 0 && TUNING.laneX.length === 3)) problems.push('TUNING 基本量非法');
+    if (TUNING.camera.radius <= TUNING.camera.minRadius || TUNING.camera.minRadius <= 0) problems.push('TUNING.camera 半径区间非法');
+    for (const k of ['halfWidth', 'spawnZ', 'intermission', 'startGold'] as const) {
     if (!(FIELD[k] > 0)) problems.push('FIELD.' + k + ' 非法');
   }
   if (!Number.isFinite(FIELD.heroZ) || FIELD.heroZ === 0) problems.push('FIELD.heroZ 非法');
@@ -588,6 +590,20 @@ function validate(): string[] {
 }
 
 /* ------------------------------ 全局注册表 ------------------------------ */
+
+/* ------------------------------ 运行时调参（阶段3e 收编散落魔法数） ------------------------------ */
+export interface TuningDef {
+  aggro: number;              // 敌人索敌半径
+  heroReachMargin: number;    // 直奔英雄时的判定余量
+  farSegment: number;         // 远段推进/近段合围的判定线（相对 heroZ）
+  projectileCap: number;      // 追踪弹池上限（溢出复用最旧槽位）
+  swingDuration: number;      // 挥击动画时长
+  flashDuration: number;      // 受击闪红时长
+  laneX: number[];            // 三路中心线（唯一出处：出怪/地标共用）
+  camera: { beta: number; radius: number; minRadius: number; maxRadius: number; fov: number; targetZ: number };
+  post: { bloomThreshold: number; bloomWeight: number; exposure: number; contrast: number };
+}
+
 export interface Config {
   HERO: HeroDef;
   SPELLS: SpellDef[];
@@ -599,6 +615,7 @@ export interface Config {
   BOSS_ROTATION: string[];
   THEMES: ThemeDef[];
   FIELD: FieldDef;
+  TUNING: TuningDef;
   waveDef: WaveDefFn;
   depthMul: DepthMulFn;
   blightPerSec: BlightPerSecFn;
@@ -611,8 +628,20 @@ export interface Config {
   validate: ValidateFn;
 }
 
+const TUNING: TuningDef = {
+  aggro: 4.2,
+  heroReachMargin: 0.3,
+  farSegment: 14,
+  projectileCap: 96,
+  swingDuration: 0.34,
+  flashDuration: 0.14,
+  laneX: [-7, 0, 7],
+  camera: { beta: 0.58, radius: 90, minRadius: 72, maxRadius: 110, fov: 0.82, targetZ: -2 },
+  post: { bloomThreshold: 0.9, bloomWeight: 0.3, exposure: 0.93, contrast: 1.05 },
+};
+
 export const CONFIG: Config = {
-  HERO, SPELLS, ENEMIES, ALLIES, UPGRADES, BRANCHES, BOSS_EVERY, BOSS_ROTATION,
+  HERO, SPELLS, ENEMIES, ALLIES, UPGRADES, BRANCHES, BOSS_EVERY, BOSS_ROTATION, TUNING,
   THEMES, FIELD,
   waveDef, depthMul, blightPerSec,
   enemyOf, allyOf, spellOf, upgradeOf, branchOf, upgradeCost, validate,

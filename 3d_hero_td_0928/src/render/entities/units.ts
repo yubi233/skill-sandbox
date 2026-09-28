@@ -103,7 +103,7 @@ export class Unit {
   takeDamage(amount: number): void {
     if (!this.alive) return;
     this.hp -= amount;
-    this.flashT = 0.14;
+    this.flashT = CONFIG.TUNING.flashDuration;
     if (!this.bar && (this.def as EnemyDef).boss !== true) this.bar = new HpBar(this.scene, this);
     if (this.bar) this.bar.setVisible(true);
     if (this.hp <= 0) this.kill();
@@ -117,7 +117,7 @@ export class Unit {
   /* 挥击动画推进；返回 true 的那一帧判定命中 */
   updateSwing(dt: number): boolean {
     if (this.swingT >= 0) {
-      this.swingT += dt / 0.34;
+      this.swingT += dt / CONFIG.TUNING.swingDuration;
       if (this.swingT >= 1) { this.swingT = -1; return true; }
     }
     return false;
@@ -154,7 +154,7 @@ export class Unit {
 }
 
 /* ------------------------------ 亡灵单位 ------------------------------ */
-const AGGRO = 4.2;
+const AGGRO = CONFIG.TUNING.aggro;   // 阶段3e：出处 CONFIG.TUNING
 export class Enemy extends Unit {
   declare def: EnemyDef;
   declare rig: EnemyRig;
@@ -221,7 +221,7 @@ export class Enemy extends Unit {
         this.rig.root.position.x += (dx / len) * speed * dt;
         this.rig.root.position.z += (dz / len) * speed * dt;
         this.rig.root.rotation.y = Math.atan2(dx, dz);
-      } else if (this.z > FIELD.heroZ + 14) {
+      } else if (this.z > FIELD.heroZ + CONFIG.TUNING.farSegment) {
         /* 远段：按路号队形推进 */
         this.rig.root.position.z -= speed * dt;
         this.rig.root.position.x += clamp(this.laneX - this.x, -1, 1) * speed * 0.22 * dt;
@@ -359,7 +359,7 @@ export class Ally extends Unit {
 const fxPoolShim = {
   burst(_game: Game, layer: string, n: number, x: number, y: number, z: number,
     velFn: Parameters<InstanceType<typeof FX.Emitter>['burst']>[4], cfg: EmitterCfg): void {
-    const e = ensureFx(layer + ':' + JSON.stringify(cfg), cfg);
+    const e = ensureFx(layer, cfg);   // key 由调用方给定（阶段3e：消灭热路径 JSON.stringify）
     e.burst(n, x, y, z, velFn);
   },
 };
@@ -451,14 +451,14 @@ export const Units = {
       const ed = unit.def as EnemyDef;
       DIRECTOR.onKill(ed.gold, ed.boss === true);
       const [r, g, b] = FX.hexToRgb(ed.eye);
-      ensureFx('deathGlow', {
+      ensureFx(`deathGlow:${ed.eye}`, {
         life: [0.3, 0.7], size0: [0.3, 0.7], size1: [0.05, 0.15], alpha: [0.5, 0.9],
         color: [r, g, b], drag: 2.2, turb: 0.8,
       }).burst(14, unit.x, 0.9 * (ed.scale || 1), unit.z, () => ({
         x: randSpread(2.6), y: rand(0.5, 3.0), z: randSpread(2.6),
       }));
       const [br, bg, bb] = FX.hexToRgb(ed.color);
-      ensureFx('deathBone', {
+      ensureFx(`deathBone:${ed.color}`, {
         life: [0.5, 1.1], size0: [0.10, 0.26], size1: [0.03, 0.08], alpha: [0.6, 1.0],
         color: [br, bg, bb], color2: [br * 0.3, bg * 0.3, bb * 0.3], drag: 1.6, turb: 0.6, gravity: 7,
       }).burst(12, unit.x, 0.8, unit.z, () => ({
@@ -478,7 +478,7 @@ export const Units = {
     } else {
       const ad = unit.def as AllyDef;
       const [r, g, b] = FX.hexToRgb(ad.trim);
-      ensureFx('allyDeath', {
+      ensureFx(`allyDeath:${ad.trim}`, {
         life: [0.4, 0.9], size0: [0.2, 0.5], size1: [0.04, 0.1], alpha: [0.5, 0.9],
         color: [r, g, b], drag: 2.0, turb: 0.7,
       }).burst(12, unit.x, 1.0, unit.z, () => ({

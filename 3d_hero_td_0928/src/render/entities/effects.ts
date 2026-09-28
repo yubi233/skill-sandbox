@@ -23,13 +23,13 @@ export function ensureFx(name: string, cfg: EmitterCfg): FxEmitter {
 /* ------------------------------ 命中火花 ------------------------------ */
 export function hitSpark(game: Game, x: number, y: number, z: number, hex: string): void {
   const [r, g, b] = FX.hexToRgb(hex);
-  Units.fxPool.burst(game, 'spark', 5, x, y, z, () => ({
+  Units.fxPool.burst(game, `spark:${hex}`, 5, x, y, z, () => ({
     x: randSpread(2.4), y: rand(0.5, 2.2), z: randSpread(2.4),
   }), { color: [r, g, b], life: [0.18, 0.4], size0: [0.05, 0.12], size1: [0.01, 0.03], alpha: [0.5, 0.9], turb: 0.4 });
 }
 export function bowFlash(game: Game, ally: Ally): void {
   const [r, g, b] = FX.hexToRgb('#ffe6a3');
-  Units.fxPool.burst(game, 'spark', 3, ally.x, 1.25, ally.z + 0.3, () => ({
+  Units.fxPool.burst(game, 'spark:bow', 3, ally.x, 1.25, ally.z + 0.3, () => ({
     x: randSpread(1.2), y: rand(0.2, 0.8), z: rand(1.5, 3),
   }), { color: [r, g, b], life: [0.12, 0.26], size0: [0.04, 0.09], size1: [0.008, 0.02], alpha: [0.5, 0.8], turb: 0.2 });
 }

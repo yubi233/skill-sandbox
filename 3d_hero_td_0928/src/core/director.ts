@@ -48,7 +48,7 @@ type RejectUpgradeReason = Extract<GameEvent, { type: 'reject-upgrade' }>['reaso
 
 const FIELD = CONFIG.FIELD;
 const HERO = CONFIG.HERO;
-const LANE_X = [-7, 0, 7];
+const LANE_X = CONFIG.TUNING.laneX;
 
 export const DIRECTOR = {
   state: 'title' as DirectorState, // title | camp | battle | intermission | defeat

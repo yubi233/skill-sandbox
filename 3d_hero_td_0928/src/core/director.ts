@@ -12,6 +12,7 @@
    ========================================================================== */
 import { CONFIG } from './config';
 import type { ThemeColors } from './config';
+import { allyCap, allyStats, cooldownMul, goldMul, spellPowerMul, upgradePreview } from './rules/stats';
 
 /* ------------------------------ 类型 ------------------------------ */
 
@@ -187,53 +188,17 @@ export const DIRECTOR = {
     return !!(parent && this.isUnlocked(parent.key));
   },
   upgradePreview(key: string) {
-    const def = CONFIG.upgradeOf(key);
-    if (!def) return { current: '', next: '' };
-    const lv = this.level(key);
-    const effect = (rank: number): string => {
-      const level = (k: string): number => (k === key ? rank : this.level(k));
-      const pct = (n: number): string => Math.round(n * 100) + '%';
-      switch (key) {
-        case 'spellPower': return pct(1 + 0.18 * rank) + ' 法术伤害';
-        case 'surge': return (CONFIG.spellOf(1)!.cooldown * Math.max(0.55, 1 - 0.07 * rank)).toFixed(2) + 's 火球冷却';
-        case 'fireMastery': return Math.round(CONFIG.spellOf(1)!.damage * (1 + 0.18 * level('spellPower')) * (1 + 0.25 * rank)) + ' 伤害 · ' + (CONFIG.spellOf(1)!.radius * (1 + 0.12 * rank)).toFixed(1) + 'm';
-        case 'frostMastery': return pct(1 - Math.max(0.15, CONFIG.spellOf(2)!.slow!.factor - 0.10 * rank)) + ' 减速 · ' + (CONFIG.spellOf(2)!.slow!.duration + 0.8 * rank).toFixed(1) + 's';
-        case 'thunderMastery': return (CONFIG.spellOf(3)!.chain!.count + rank) + ' 次连锁 · ' + pct(1 + 0.20 * rank) + ' 伤害';
-        case 'resounding': return rank + ' 次弹跳';
-        case 'oath': return pct(1 + 0.15 * rank) + ' 全军攻击';
-        case 'guardDrill': return Math.round(CONFIG.allyOf('guard')!.hp * (1 + 0.20 * rank)) + ' 生命 · ' + (CONFIG.allyOf('guard')!.atkInterval * Math.max(0.5, 1 - 0.10 * rank)).toFixed(2) + 's';
-        case 'hunterLore': return pct(1 + 0.20 * rank) + ' 攻击 · ' + (CONFIG.allyOf('hunter')!.atkInterval * Math.max(0.5, 1 - 0.10 * rank)).toFixed(2) + 's';
-        case 'muster': return (CONFIG.allyOf('guard')!.cap + 2 * rank) + ' / 军种';
-        case 'fortitude': return (HERO.hp + 25 * rank) + ' 生命';
-        case 'spiritDrain': return '+' + rank + ' 生命 / 击杀';
-        case 'greed': return pct(1 + 0.12 * rank) + ' 击杀金币';
-        case 'lastStand': return rank ? '每次出战 1 次' : '未获得保护';
-        case 'autoFire': case 'autoFrost': case 'autoThunder': return rank ? '自动施放' : '手动施放';
-        default: return rank ? '永久解锁' : '尚未学会';
-      }
-    };
-    return { current: effect(lv), next: effect(Math.min(def.max, lv + 1)) };
+    return upgradePreview(this.levels, key);
   },
-  spellPowerMul() { return 1 + 0.18 * this.level('spellPower'); },
-  cooldownMul() { return Math.max(0.55, 1 - 0.07 * this.level('surge')); },
-  goldMul() { return 1 + 0.12 * this.level('greed'); },
+    spellPowerMul() { return spellPowerMul(this.levels); },
+  cooldownMul() { return cooldownMul(this.levels); },
+  goldMul() { return goldMul(this.levels); },
   /* 按军种聚合天赋：誓约武备(全军攻) + 军种节点(生命/攻速) */
   allyStats(allyKey: string) {
-    let atk = 1 + 0.15 * this.level('oath');
-    let hp = 1;
-    let interval = 1;
-    if (allyKey === 'guard') {
-      hp = 1 + 0.20 * this.level('guardDrill');
-      interval = 1 - 0.10 * this.level('guardDrill');
-    } else if (allyKey === 'hunter') {
-      atk *= 1 + 0.20 * this.level('hunterLore');
-      interval = 1 - 0.10 * this.level('hunterLore');
-    }
-    return { atk, hp, interval: Math.max(0.5, interval) };
+    return allyStats(this.levels, allyKey);
   },
-  capOf(allyKey: string) {
-    const def = CONFIG.allyOf(allyKey);
-    return def ? def.cap + 2 * this.level('muster') : 0;
+    capOf(allyKey: string) {
+    return allyCap(this.levels, allyKey);
   },
   upgradeCost(key: string) {
     const def = CONFIG.upgradeOf(key);
@@ -393,4 +358,6 @@ export const DIRECTOR = {
 };
 
 // TODO(阶段2末)：全部模块转换后移除此全局桥
-(window as unknown as { DIRECTOR: typeof DIRECTOR }).DIRECTOR = DIRECTOR;
+if (typeof window !== 'undefined') {
+  (window as unknown as { DIRECTOR: typeof DIRECTOR }).DIRECTOR = DIRECTOR;
+}

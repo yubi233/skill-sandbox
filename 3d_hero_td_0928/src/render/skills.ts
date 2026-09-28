@@ -11,6 +11,7 @@ import * as BABYLON from '@babylonjs/core';
 import { FX, type FxSpriteMesh, type FxBlending } from './particles';
 import { CONFIG, type SpellDef } from '../core/config';
 import { DIRECTOR } from '../core/director';
+import { spellTuning } from '../core/rules/stats';
 import { Units, ResourceOwner, type Enemy } from './entities/units';
 import type { Game } from './scene';
 
@@ -63,37 +64,18 @@ export const PHASE_LABEL = {
 
 const DEFS: SpellDef[] = CONFIG.SPELLS.map((s) => ({ ...s }));
 
-/* 有效参数：注册表基线 × 通用乘数 × 法术精通节点 */
+/* 有效参数：注册表基线 × 通用乘数 × 法术精通节点（公式唯一出处：core/rules/stats.ts） */
 function profile(id: number): SpellProfile | null {
   const def = DEFS.find((d) => d.id === Number(id));
   if (!def) return null;
-  const lv = (key: string): number => (DIRECTOR ? DIRECTOR.level(key) : 0);
-  const dmgMul = DIRECTOR ? DIRECTOR.spellPowerMul() : 1;
-  const cdMul = DIRECTOR ? DIRECTOR.cooldownMul() : 1;
-  let damage = def.damage * dmgMul;
-  let radius = def.radius;
-  let slow = def.slow ? { factor: def.slow.factor, duration: def.slow.duration } : null;
-  let chain = def.chain ? { count: def.chain.count, damage: def.chain.damage * dmgMul, range: def.chain.range } : null;
-  if (def.id === 1) {
-    damage *= 1 + 0.25 * lv('fireMastery');
-    radius *= 1 + 0.12 * lv('fireMastery');
-  } else if (def.id === 2) {
-    damage *= 1 + 0.15 * lv('frostMastery');
-    if (slow) {
-      slow.factor = Math.max(0.15, slow.factor - 0.10 * lv('frostMastery'));
-      slow.duration += 0.8 * lv('frostMastery');
-    }
-  } else if (def.id === 3) {
-    damage *= 1 + 0.20 * lv('thunderMastery');
-    if (chain) chain.count += lv('thunderMastery');
-  }
+  const t = spellTuning(def, DIRECTOR.levels);
   return {
     id: def.id, name: def.name, color: def.color,
-    range: def.range, radius,
-    damage,
+    range: def.range, radius: t.radius,
+    damage: t.damage,
     windup: def.windup,
-    cooldown: Math.max(0.6, def.cooldown * cdMul),
-    flightSpeed: def.flightSpeed, slow, chain,
+    cooldown: t.cooldown,
+    flightSpeed: def.flightSpeed, slow: t.slow, chain: t.chain,
   };
 }
 function texture(name: string, fallback?: string): BABYLON.DynamicTexture {
@@ -824,4 +806,6 @@ export const SPELLS = {
 };
 
 // TODO(阶段2末)：全部模块转换后移除此全局桥
-(window as unknown as { SPELLS: typeof SPELLS }).SPELLS = SPELLS;
+if (typeof window !== 'undefined') {
+  (window as unknown as { SPELLS: typeof SPELLS }).SPELLS = SPELLS;
+}

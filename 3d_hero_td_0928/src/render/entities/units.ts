@@ -580,6 +580,10 @@ export const Units = {
 };
 
 // TODO(阶段2末)：全部模块转换后移除此全局桥（dev/main.js / ui.js / skills.js 读取 window）
-(window as unknown as { Units: typeof Units }).Units = Units;
+if (typeof window !== 'undefined') {
+  (window as unknown as { Units: typeof Units }).Units = Units;
+}
 // TODO(阶段2末)：全部模块转换后移除此全局桥（dev/skills.js 的 SpellCast 继承此类）
-(window as unknown as { ResourceOwner: typeof ResourceOwner }).ResourceOwner = ResourceOwner;
+if (typeof window !== 'undefined') {
+  (window as unknown as { ResourceOwner: typeof ResourceOwner }).ResourceOwner = ResourceOwner;
+}

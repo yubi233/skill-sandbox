@@ -562,4 +562,6 @@ export const UI = {
 };
 
 // TODO(阶段2末)：全部模块转换后移除此全局桥
-(window as unknown as { UI: typeof UI }).UI = UI;
+if (typeof window !== 'undefined') {
+  (window as unknown as { UI: typeof UI }).UI = UI;
+}

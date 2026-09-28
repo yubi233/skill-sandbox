@@ -427,7 +427,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 /* ------------------------------ 全局兼容桥 ------------------------------ */
 export const Core = { createGame, Mage, TargetRing };
 // TODO(阶段2末)：全部模块转换后移除此全局桥
-(window as unknown as { Core: typeof Core }).Core = Core;
+if (typeof window !== 'undefined') {
+  (window as unknown as { Core: typeof Core }).Core = Core;
+}
 
 /* 单一入口重导出：后续模块统一从本文件取战场对象 */
 export { Mage } from './mage';

@@ -57,7 +57,7 @@ export interface Game {
   tick: (dt: number) => void;
   renderPaused?: boolean;
   fpsEma?: number;
-  __watchdog?: number | null;
+  __watchdog?: ReturnType<typeof setInterval> | null;
   lateUpdate: (dt: number) => void;
   update: (dt: number) => void;
   render: () => void;

@@ -11,7 +11,9 @@
     "test": "node --import tsx --test tests/*.test.ts && node --test tests/*.test.js",
     "test:legacy": "node --test tests/*.test.js",
     "build:legacy": "node dev/build.mjs",
-    "verify": "npm run typecheck && npm run build && npm run test"
+    "verify": "npm run typecheck && npm run build && npm run test && npm run sim",
+    "sim": "tsx tools/headless_sim.ts",
+    "sim:stress": "tsx tools/headless_sim.ts --stress"
   },
   "dependencies": {
     "@babylonjs/core": "7.54.3"

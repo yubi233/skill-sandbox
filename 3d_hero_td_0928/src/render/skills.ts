@@ -12,6 +12,7 @@ import { FX, type FxSpriteMesh, type FxBlending } from './particles';
 import { CONFIG, type SpellDef } from '../core/config';
 import { DIRECTOR } from '../core/director';
 import { spellTuning } from '../core/rules/stats';
+import { leadPoint, pickAutoTarget, shouldAutoCast } from '../core/rules/combat';
 import { Units, ResourceOwner, type Enemy } from './entities/units';
 import type { Game } from './scene';
 
@@ -700,9 +701,15 @@ export const SPELLS = {
     const AUTO_KEY: Record<number, string> = { 1: 'autoFire', 2: 'autoFrost', 3: 'autoThunder' };
     const mp = game.mage.root.position;
     for (const id of [1, 2, 3]) {
-      if (!DIRECTOR.ownsSpell(String(id)) || DIRECTOR.level(AUTO_KEY[id]) <= 0) continue;
-      if (!this.isReady(id)) continue;
-      if (this.casts.length >= this.budget.casts) continue;
+      if (!shouldAutoCast({
+        stateIsBattle: true,
+        completedDelves: DIRECTOR.completedDelves,
+        owned: DIRECTOR.ownsSpell(String(id)),
+        autoRank: DIRECTOR.level(AUTO_KEY[id]),
+        cooldownReady: this.isReady(id),
+        activeCasts: this.casts.length,
+        castBudget: this.budget.casts,
+      })) continue;
       const p = profile(id)!;
       const point = this.autoTargetPoint(p.radius, id);
       if (!point) continue;
@@ -713,38 +720,12 @@ export const SPELLS = {
   targetPoint(enemy: SpellTargetEnemy | null, id: number): { x: number; z: number } | null {
     const p = profile(id);
     if (!p || !enemy || !enemy.alive) return null;
-    const hero = { x: CONFIG.HERO.position[0], z: CONFIG.FIELD.heroZ };
-    let toward: SpellTargetEnemy | { x: number; z: number } = hero, near = 4.2;
-    for (const ally of Units.allies) {
-      if (!ally.alive) continue;
-      const d = Math.hypot(ally.x - enemy.x, ally.z - enemy.z);
-      if (d < near) { near = d; toward = ally; }
-    }
-    const dx = toward.x - enemy.x, dz = toward.z - enemy.z;
-    const remaining = Math.hypot(dx, dz);
-    const reach = enemy.def.reach + (toward === hero ? 0.3 : 0);
-    const speed = enemy.speedNow ? enemy.speedNow() : enemy.def.speed;
-    const range = Math.hypot(enemy.x - hero.x, enemy.z - hero.z);
-    const flight = p.flightSpeed > 0 ? range / (p.flightSpeed + speed) : 0;
-    const travel = Math.min(Math.max(0, remaining - reach), speed * (p.windup + 0.16 + flight));
-    if (toward === hero && enemy.z > hero.z + 14) return { x: enemy.x, z: enemy.z - travel };
-    const k = remaining > 0 ? travel / remaining : 0;
-    return { x: enemy.x + dx * k, z: enemy.z + dz * k };
+    return leadPoint(enemy, { windup: p.windup, flightSpeed: p.flightSpeed, range: p.range, radius: p.radius }, Units.allies);
   },
   autoTargetPoint(radius: number, id: number): { x: number; z: number } | null {
     const p = profile(id || 1);
     if (!p) return null;
-    let best: Enemy | null = null, bestScore = 0;
-    for (const e of Units.enemies) {
-      if (!e.alive) continue;
-      if (Math.hypot(e.x - CONFIG.HERO.position[0], e.z - CONFIG.FIELD.heroZ) > p.range) continue;
-      let score = 1 + (CONFIG.FIELD.heroZ + 46 - e.z) * 0.04; /* 越靠近防线越优先 */
-      for (const o of Units.enemies) {
-        if (o === e || !o.alive) continue;
-        if (Math.hypot(o.x - e.x, o.z - e.z) <= radius) score += 1;
-      }
-      if (score > bestScore) { bestScore = score; best = e; }
-    }
+    const best = pickAutoTarget(Units.enemies, p.range, radius);
     return best ? this.targetPoint(best, id || 1) : null;
   },
   autoMuzzleFlash(_game: Game): void {

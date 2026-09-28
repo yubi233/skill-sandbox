@@ -12,8 +12,9 @@ import * as BABYLON from '@babylonjs/core';
 import { CONFIG } from '../core/config';
 import { DIRECTOR } from '../core/director';
 import { SPELLS } from './skills';
+import { checkCast, pickFrontTarget } from '../core/rules/combat';
 import { UI } from './ui';
-import { Units, type Enemy } from './entities/units';
+import { Units } from './entities/units';
 import type { Game } from './scene';
 
 /* —— main.ts 的统一时间步需按原序列在 lateUpdate 之后、UI.update 之前调用 updateAim。
@@ -101,18 +102,21 @@ export function attachInput(game: Game, canvas: HTMLCanvasElement): void {
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   function tryCast(point: { x: number; z: number }) {
-    if (!DIRECTOR.inRun()) return false;
-    if (!UI.selectedId) { UI.toast('点击法术栏，或按 1 选择火球术'); return false; }
-    if (!DIRECTOR.ownsSpell(String(UI.selectedId))) return false;
     const def = SPELLS.defs.find((d) => d.id === UI.selectedId);
-    if (!def) return false;
-    if (!SPELLS.isReady(def.id)) { UI.toast(def.name + ' · 冷却中'); return false; }
     const mp = game.mage.root.position;
-    const distance = Math.hypot(point.x - mp.x, point.z - mp.z);
-    if (distance > def.range) {
-      UI.toast('超出射程 · ' + def.range + ' m');
-      return false;
-    }
+    const check = checkCast({
+      inRun: DIRECTOR.inRun(),
+      selectedId: UI.selectedId,
+      known: !!def,
+      owned: !!def && DIRECTOR.ownsSpell(String(def.id)),
+      cooldownReady: !!def && SPELLS.isReady(def.id),
+      distance: Math.hypot(point.x - mp.x, point.z - mp.z),
+      range: def ? def.range : Infinity,
+    });
+    if (check === 'no-selection') { UI.toast('点击法术栏，或按 1 选择火球术'); return false; }
+    if (check === 'cooldown') { UI.toast((def as NonNullable<typeof def>).name + ' · 冷却中'); return false; }
+    if (check === 'out-of-range') { UI.toast('超出射程 · ' + (def as NonNullable<typeof def>).range + ' m'); return false; }
+    if (check !== 'ok' || !def) return false;
     const ok = SPELLS.start(game, def.id, point);
     if (!ok) UI.toast(SPELLS.lastRejectReason === 'error' ? '释放异常，法术已回收' : '上一法术仍在释放');
     return ok;
@@ -124,14 +128,8 @@ export function attachInput(game: Game, canvas: HTMLCanvasElement): void {
     const def = SPELLS.defs.find((d) => d.id === UI.selectedId);
     if (!def) return;
     const mp = game.mage.root.position;
-    /* 自动锁定：射程内最远的正面威胁（更靠近防线的敌人优先） */
-    let target: Enemy | null = null, bestZ = Infinity;
-    for (const e of Units.enemies) {
-      if (!e.alive) continue;
-      const d = Math.hypot(e.x - mp.x, e.z - mp.z);
-      if (d > def.range) continue;
-      if (e.z < bestZ) { bestZ = e.z; target = e; }
-    }
+    /* 自动锁定：射程内最靠前的正面威胁（策略在 core/rules/combat.ts） */
+    const target = pickFrontTarget(Units.enemies, def.range);
     /* targetPoint 仅在敌人存活/注册表命中失败时为 null，上方已过滤存活；
        非空断言只作用于类型层，运行时与原 JS 直传一致 */
     const point = target

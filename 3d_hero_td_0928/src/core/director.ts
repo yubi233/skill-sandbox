@@ -12,6 +12,8 @@
    ========================================================================== */
 import { CONFIG } from './config';
 import type { ThemeColors } from './config';
+import { gameEvents, type GameEvent } from './events';
+import { combatSpread } from './rng';
 import { allyCap, allyStats, cooldownMul, goldMul, spellPowerMul, upgradePreview } from './rules/stats';
 
 /* ------------------------------ 类型 ------------------------------ */
@@ -41,16 +43,12 @@ export interface DirectorWorld {
   applyTheme(theme: ThemeColors): void;                   // game.applyTheme(theme)
 }
 
-/* 事件监听器：阶段3将替换为带类型的事件队列；暂保留字符串 kind 的 on/emit 机制 */
-export type DirectorListener = (kind: string, data: any) => void;
+/* 研习拒绝原因：events.ts 中 reject-upgrade 事件的 reason 联合（单一事实源，不重复手写）。 */
+type RejectUpgradeReason = Extract<GameEvent, { type: 'reject-upgrade' }>['reason'];
 
 const FIELD = CONFIG.FIELD;
 const HERO = CONFIG.HERO;
 const LANE_X = [-7, 0, 7];
-
-/* 出怪散布扰动：与 FX.randSpread 同式。该式为纯数学（无引擎/无状态），
-   核心层禁止 import 渲染模块，故本地自带一份，行为逐位一致。 */
-const randSpread = (a: number): number => (Math.random() * 2 - 1) * a;
 
 export const DIRECTOR = {
   state: 'title' as DirectorState, // title | camp | battle | intermission | defeat
@@ -66,18 +64,9 @@ export const DIRECTOR = {
   _queue: [] as Array<{ defKey: string; at: number; lane: number }>, // 待生成 {defKey, at, lane}
   _waveT: 0,
   _interT: 0,
-  _listeners: [] as DirectorListener[],
   completedDelves: 0,
   _runActive: false,
   _lastStandUsed: false,
-
-  on(fn: DirectorListener) { this._listeners.push(fn); },
-  /* data 可省略（原 JS 即有 emit('reset') 单参调用，监听器收到 undefined） */
-  emit(kind: string, data?: any) {
-    for (const fn of this._listeners) {
-      try { fn(kind, data); } catch (e) { console.error('[director] 监听器异常: ' + (e as Error)); }
-    }
-  },
 
   /* 兼容旧签名（dev/main.js 与测试仍传 game）：核心不再持有游戏壳，仅复位。
      世界钩子请改用 bindWorld() 注入。 */
@@ -107,7 +96,7 @@ export const DIRECTOR = {
     this._interT = 0;
     this._world?.clearWorld();
     this._world?.resetSpells();
-    this.emit('reset');
+    gameEvents.push({ type: 'reset' });
   },
 
   /* ------------------------------ 地下城循环 ------------------------------ */
@@ -117,7 +106,7 @@ export const DIRECTOR = {
   begin() {
     if (this.state !== 'title') return;
     this.state = 'camp';
-    this.emit('camp', {});
+    gameEvents.push({ type: 'camp' });
   },
   enterDelve() {
     if (this.state !== 'camp') return false;
@@ -130,7 +119,7 @@ export const DIRECTOR = {
     this._world?.resetSpells();
     this._world?.applyTheme(CONFIG.THEMES[0].theme);
     this.nextWave();
-    this.emit('delve', { record: this.record });
+    gameEvents.push({ type: 'delve', record: this.record });
     return true;
   },
   /* 主动撤退：带着战利品回营（与败北同结果，但体面） */
@@ -138,7 +127,7 @@ export const DIRECTOR = {
     if (this.state !== 'battle' && this.state !== 'intermission') return false;
     const wave = this.wave;
     this.goCamp();
-    this.emit('retreat', { wave, gold: this.gold });
+    gameEvents.push({ type: 'retreat', wave, gold: this.gold });
     return true;
   },
   _finishDelve() {
@@ -153,7 +142,7 @@ export const DIRECTOR = {
     this._queue.length = 0;
     this._world?.clearWorld();
     this._world?.resetSpells();
-    this.emit('camp', {});
+    gameEvents.push({ type: 'camp' });
   },
 
   /* ------------------------------ 升级乘数 ------------------------------ */
@@ -206,7 +195,9 @@ export const DIRECTOR = {
   },
 
   /* ------------------------------ 经济 ------------------------------ */
-  onKill(gold: number, isBoss: boolean) {
+  /* onKill(gold, isBoss)：isBoss 形参保留（调用方 Units.onDeath 仍传）；
+     原 'gold' 事件删除后暂无消费方，留作头目结算的钩子位。 */
+  onKill(gold: number, _isBoss: boolean) {
     this.kills++;
     if (this.state === 'battle' || this.state === 'intermission') this.runKills++;
     const mul = this.depthMul();
@@ -217,7 +208,7 @@ export const DIRECTOR = {
     if (drain > 0 && this.heroHp < this.heroMaxHp) {
       this.heroHp = Math.min(this.heroMaxHp, this.heroHp + drain);
     }
-    this.emit('gold', { gained, total: this.gold, isBoss });
+    /* 原 emit('gold') 已删：dev/ui.js 从无 'gold' 监听（HUD 逐帧直读 DIRECTOR.gold）。 */
   },
   buyUpgrade(key: string) {
     if (this.state !== 'camp') return this._rejectBuy(key, 'camp');
@@ -237,12 +228,12 @@ export const DIRECTOR = {
     }
     /* 军团分支：购买即重算在场单位（保留已损血量比例） */
     if (['oath', 'guardDrill', 'hunterLore'].includes(key)) this.refreshAllies();
-    this.emit('upgrade', { key, level: lv + 1 });
+    gameEvents.push({ type: 'upgrade', key, name: def.name, level: lv + 1 });
     return true;
   },
-  _rejectBuy(key: string, reason: string) {
+  _rejectBuy(key: string, reason: RejectUpgradeReason) {
     const def = CONFIG.upgradeOf(key);
-    this.emit('reject-upgrade', { key, name: def ? def.name : key, reason });
+    gameEvents.push({ type: 'reject-upgrade', name: def ? def.name : key, reason });
     return false;
   },
   refreshAllies() {
@@ -257,18 +248,19 @@ export const DIRECTOR = {
   summon(allyKey: string) {
     const def = CONFIG.allyOf(allyKey);
     if (!def) return false;
+    /* 原 reason 'battle' 归一为联合类型的 'state'（UI 文案两者本就同串，逐字不变） */
     if (!this.inRun() || !this.ownsAlly(allyKey)) {
-      this.emit('reject', { reason: this.inRun() ? 'locked' : 'battle', name: def.name });
+      gameEvents.push({ type: 'reject-summon', reason: this.inRun() ? 'locked' : 'state', name: def.name });
       return false;
     }
     const alive = (this._world?.allies() ?? []).filter((a) => a.alive && a.def.key === allyKey).length;
-    if (alive >= this.capOf(allyKey)) { this.emit('reject', { reason: 'cap', name: def.name }); return false; }
-    if (this.gold < def.cost) { this.emit('reject', { reason: 'gold', name: def.name }); return false; }
+    if (alive >= this.capOf(allyKey)) { gameEvents.push({ type: 'reject-summon', reason: 'cap', name: def.name }); return false; }
+    if (this.gold < def.cost) { gameEvents.push({ type: 'reject-summon', reason: 'gold', name: def.name }); return false; }
     this.gold -= def.cost;
     const stats = this.allyStats(allyKey);
     const a = this._world?.spawnAlly(allyKey, stats);
-    if (!a) { this.gold += def.cost; this.emit('reject', { reason: 'slot', name: def.name }); return false; }
-    this.emit('summon', { name: def.name });
+    if (!a) { this.gold += def.cost; gameEvents.push({ type: 'reject-summon', reason: 'slot', name: def.name }); return false; }
+    gameEvents.push({ type: 'summon', name: def.name, trim: def.trim });
     return true;
   },
 
@@ -280,17 +272,17 @@ export const DIRECTOR = {
     if (this.heroHp <= 0 && this.level('lastStand') > 0 && !this._lastStandUsed) {
       this.heroHp = 1;
       this._lastStandUsed = true;
-      this.emit('laststand', {});
+      gameEvents.push({ type: 'laststand' });
       this._world?.shake(0.6);
     }
-    this.emit('hurt', { hp: this.heroHp });
+    /* 原 emit('hurt') 已删：dev/ui.js 从无 'hurt' 监听（血条逐帧直读 DIRECTOR.heroHp）。 */
     if (this.heroHp <= 0) {
       this._finishDelve();
       this.state = 'defeat';
       this._world?.clearWorld();
       this._world?.resetSpells();
       /* 败北返营：金币与天赋全保留，可强化后再下探 */
-      this.emit('defeat', { wave: this.wave });
+      gameEvents.push({ type: 'defeat', wave: this.wave });
     }
   },
 
@@ -317,7 +309,8 @@ export const DIRECTOR = {
       this._world?.applyTheme(theme.theme);
       this._world?.shake(0.5);
     }
-    this.emit('wave', {
+    gameEvents.push({
+      type: 'wave',
       wave: this.wave, hasBoss,
       banner: def.banner || (hasBoss ? '首领波' : ''),
     });
@@ -335,8 +328,10 @@ export const DIRECTOR = {
       this._waveT += dt;
       while (this._queue.length && this._queue[0].at <= this._waveT) {
         const item = this._queue.shift()!;
-        const x = LANE_X[(item.lane + 1)] + randSpread(1.6);
-        const z = FIELD.spawnZ + randSpread(2.4);
+        /* 出怪散布走 gameRng.combat（阶段3d：?seed= 注入后逐位可复现；
+           调用顺序 1.6→2.4 保持与原 randSpread 一致，分布同为均匀。 */
+        const x = LANE_X[(item.lane + 1)] + combatSpread(1.6);
+        const z = FIELD.spawnZ + combatSpread(2.4);
         this._world?.spawnEnemy(item.defKey, x, z);
       }
       if (this.state === 'battle' &&
@@ -347,7 +342,7 @@ export const DIRECTOR = {
         this.gold += bonus;
         this.state = 'intermission';
         this._interT = FIELD.intermission;
-        this.emit('clear', { wave: this.wave, bonus });
+        gameEvents.push({ type: 'clear', wave: this.wave, bonus });
       }
     } else if (this.state === 'intermission') {
       this._interT -= dt;
@@ -356,8 +351,3 @@ export const DIRECTOR = {
   },
   intermissionLeft() { return Math.max(0, this._interT); },
 };
-
-// TODO(阶段2末)：全部模块转换后移除此全局桥
-if (typeof window !== 'undefined') {
-  (window as unknown as { DIRECTOR: typeof DIRECTOR }).DIRECTOR = DIRECTOR;
-}

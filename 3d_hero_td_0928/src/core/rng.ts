@@ -40,3 +40,27 @@ export function rngRange(rng: Rng, min: number, max: number): number {
 export function rngInt(rng: Rng, minInclusive: number, maxExclusive: number): number {
   return minInclusive + Math.floor(rng() * (maxExclusive - minInclusive));
 }
+
+/* ============================================================================
+   领域 RNG 分流（阶段3d：种子确定性的接线点）
+   - combat   ：一切影响玩法结果的随机（出怪散布、单位首攻节拍）。?seed= 注入
+     后可逐位复现；分布与 Math.random 同为均匀，仅换成可复现源。
+   - cosmetic ：预留的表现域（当前无人使用）。
+   - 其余 Math.random 保持未播种：FX 粒子抖动、walkPhase/bob、镜头震屏等纯
+     表现随机继续走 FX 的 Math.random；FX.time 是时钟，同样不播种。
+     原则：表现层随机不得反过来影响战斗结果（领域派生保证两域互不相干）。
+   ========================================================================== */
+export const gameRng = {
+  combat: mulberry32(1),
+  cosmetic: mulberry32(1),
+  /** 以基础种子重派生两域（render/main 启动时注入 ?seed=，测试可显式重置）。 */
+  reseed(base: number): void {
+    this.combat = mulberry32(deriveSeed(base, 'combat'));
+    this.cosmetic = mulberry32(deriveSeed(base, 'cosmetic'));
+  },
+};
+
+/** 战斗域散布扰动：(rng()*2-1)*spread，与 FX.randSpread 同式，但走 gameRng.combat。 */
+export function combatSpread(spread: number): number {
+  return (gameRng.combat() * 2 - 1) * spread;
+}

@@ -12,6 +12,7 @@
 import * as BABYLON from '@babylonjs/core';
 import { CONFIG, type EnemyDef, type AllyDef } from '../../core/config';
 import { DIRECTOR } from '../../core/director';
+import { gameRng, rngRange } from '../../core/rng';
 import { FX, type EmitterCfg, type FxSpriteMesh } from '../particles';
 import type { Game } from '../scene';
 import { ResourceOwner } from './resource_owner';
@@ -78,7 +79,9 @@ export class Unit {
     this.alive = true;
     this.dead = false;
     this.atk = def.atk * depth.atk;
-    this.attackTimer = rand(0.1, 0.5);
+    /* 首攻节拍属战斗因果 → gameRng.combat（?seed= 可复现）；
+       分布与原 rand 同为 [0.1, 0.5) 均匀。walkPhase 等表现随机仍走 FX。 */
+    this.attackTimer = rngRange(gameRng.combat, 0.1, 0.5);
     this.swingT = -1;               // -1 = 未在挥击；0..1 挥击进度
     this.walkPhase = rand(0, Math.PI * 2);
     this.slowUntil = 0;

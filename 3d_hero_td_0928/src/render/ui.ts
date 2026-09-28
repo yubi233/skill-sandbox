@@ -6,6 +6,7 @@
    ========================================================================== */
 import { CONFIG, type SpellDef, type AllyDef, type UpgradeDef } from '../core/config';
 import { DIRECTOR } from '../core/director';
+import type { GameEvent } from '../core/events';
 import { SPELLS } from './skills';
 import { Units } from './entities/units';
 import { FX } from './particles';
@@ -122,52 +123,75 @@ export const UI = {
       }
     });
 
-    DIRECTOR.on((kind, data) => {
-      if (kind === 'camp') {
-        this.showCamp();
-      } else if (kind === 'wave') {
-        this.hideScreen();
-        this.banner('第 ' + data.wave + ' 波' + (data.wave % CONFIG.BOSS_EVERY === 0 ? ' · 头目' : ''),
-          data.banner || '守住防线 · 击退亡灵，收集金币');
-      } else if (kind === 'delve') {
-        this.hideScreen();
-        this.clearSelection();
-        this.select(1);
-        this._updateHud();
-      } else if (kind === 'clear') {
-        this._syncSurfaces();
-        this._updateHud();
-        this.banner('第 ' + data.wave + ' 波守住', '获得 ' + data.bonus + ' 金 · 继续迎战，或按 R 安全回营');
-      } else if (kind === 'retreat') {
-        this.toast('安全回营 · 抵达第 ' + data.wave + ' 波，金币全部保留');
-      } else if (kind === 'defeat') {
-        this.showScreen('防线失守', '这次下探告一段落，火种仍在。\n金币与已学会的能力全部保留。',
-          '带着收获回营', () => DIRECTOR.goCamp());
-      } else if (kind === 'reset') {
-        this._showTitle();
-      } else if (kind === 'reject') {
-        const why: Record<string, string> = { gold: '金币不足', cap: '已达在场上限', slot: '集结位已满', locked: '尚未学会', battle: '仅下探时可召唤', state: '仅下探时可召唤' };
-        this.toast((data.name || '召唤') + ' · ' + (why[data.reason] || '暂时无法召唤'));
-      } else if (kind === 'reject-upgrade') {
-        const why: Record<string, string> = { gold: '金币不足', locked: '尚未满足前置条件', max: '已达最高阶',
-          unknown: '未知研习项目', state: '返回营地后才能投资', camp: '返回营地后才能投资',
-          first: '完成首次下探后开放投资', 'first-delve': '完成首次下探后开放投资' };
-        this.toast((data.name || '研习') + ' · ' + (why[data.reason] || '暂时无法投资'));
-      } else if (kind === 'upgrade') {
-        const def = CONFIG.upgradeOf(data.key);
-        if (def) this.toast(def.name + ' · 第 ' + DIRECTOR.level(def.key) + ' 阶已掌握');
-        this._campSignature = '';
-        if (this._surface === 'camp') this._renderCamp();
-      } else if (kind === 'laststand') {
-        const def = CONFIG.upgradeOf('lastStand');
-        this.banner(def ? def.name : '最终壁垒', '圣辉挡下了致命一击 · 本次下探已消耗');
-      } else if (kind === 'summon') {
-        this.toast(data.name + ' 加入防线');
-        this._updateHud();
-      }
-    });
     this._showTitle();
     this._updateHud();
+  },
+
+  /* 事件分发（阶段3d）：main 每渲染帧 drain 一次 gameEvents 后整批送达。
+     逐事件语义与原 DIRECTOR.on 回调逐字一致（toast/横幅/表面切换/选中法术/
+     签名失效）；HUD 数值不在此处驱动——UI 每帧直读 DIRECTOR 状态（_updateHud）。 */
+  handleEvents(events: readonly GameEvent[]) {
+    for (const ev of events) {
+      switch (ev.type) {
+        case 'camp':
+          this.showCamp();
+          break;
+        case 'wave':
+          this.hideScreen();
+          this.banner('第 ' + ev.wave + ' 波' + (ev.wave % CONFIG.BOSS_EVERY === 0 ? ' · 头目' : ''),
+            ev.banner || '守住防线 · 击退亡灵，收集金币');
+          break;
+        case 'delve':
+          this.hideScreen();
+          this.clearSelection();
+          this.select(1);
+          this._updateHud();
+          break;
+        case 'clear':
+          this._syncSurfaces();
+          this._updateHud();
+          this.banner('第 ' + ev.wave + ' 波守住', '获得 ' + ev.bonus + ' 金 · 继续迎战，或按 R 安全回营');
+          break;
+        case 'retreat':
+          this.toast('安全回营 · 抵达第 ' + ev.wave + ' 波，金币全部保留');
+          break;
+        case 'defeat':
+          this.showScreen('防线失守', '这次下探告一段落，火种仍在。\n金币与已学会的能力全部保留。',
+            '带着收获回营', () => DIRECTOR.goCamp());
+          break;
+        case 'reset':
+          this._showTitle();
+          break;
+        case 'reject-summon': {
+          const why: Record<string, string> = { gold: '金币不足', cap: '已达在场上限', slot: '集结位已满', locked: '尚未学会', state: '仅下探时可召唤' };
+          this.toast((ev.name || '召唤') + ' · ' + (why[ev.reason] || '暂时无法召唤'));
+          break;
+        }
+        case 'reject-upgrade': {
+          const why: Record<string, string> = { gold: '金币不足', locked: '尚未满足前置条件', max: '已达最高阶',
+            unknown: '未知研习项目', state: '返回营地后才能投资', camp: '返回营地后才能投资',
+            first: '完成首次下探后开放投资', 'first-delve': '完成首次下探后开放投资' };
+          this.toast((ev.name || '研习') + ' · ' + (why[ev.reason] || '暂时无法投资'));
+          break;
+        }
+        case 'upgrade': {
+          const def = CONFIG.upgradeOf(ev.key);
+          if (def) this.toast(def.name + ' · 第 ' + DIRECTOR.level(def.key) + ' 阶已掌握');
+          this._campSignature = '';
+          if (this._surface === 'camp') this._renderCamp();
+          break;
+        }
+        case 'laststand': {
+          const def = CONFIG.upgradeOf('lastStand');
+          this.banner(def ? def.name : '最终壁垒', '圣辉挡下了致命一击 · 本次下探已消耗');
+          break;
+        }
+        case 'summon':
+          this.toast(ev.name + ' 加入防线');
+          this._updateHud();
+          break;
+      }
+    }
   },
 
   _makeSlot(def: SpellDef | AllyDef, ally: boolean): HTMLButtonElement {

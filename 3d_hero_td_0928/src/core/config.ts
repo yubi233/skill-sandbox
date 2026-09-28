@@ -618,7 +618,3 @@ export const CONFIG: Config = {
   enemyOf, allyOf, spellOf, upgradeOf, branchOf, upgradeCost, validate,
 };
 
-// TODO(阶段2末)：全部模块转换后移除此全局桥
-if (typeof window !== 'undefined') {
-  (window as unknown as { CONFIG: typeof CONFIG }).CONFIG = CONFIG;
-}

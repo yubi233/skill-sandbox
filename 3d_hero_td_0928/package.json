@@ -11,7 +11,7 @@
     "test": "node --import tsx --test tests/*.test.ts && node --test tests/*.test.js",
     "test:legacy": "node --test tests/*.test.js",
     "build:legacy": "node dev/build.mjs",
-    "verify": "npm run typecheck && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run build && npm run test"
   },
   "dependencies": {
     "@babylonjs/core": "7.54.3"

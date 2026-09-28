@@ -1,6 +1,8 @@
 /* ============================================================================
    headless_sim.ts — 无头验收测试（阶段4，参考 3d_survivors_like_0922 的
    tools/headless_sim）：NullEngine + 占位贴图，零 DOM 跑完整下探。
+   共用骨架（占位 FX / HeadlessGame / 绑定 + DirectorWorld 接线 / tickOnce /
+   错误捕获）已抽到 tests/helpers/headless.ts，与 TS 表测试同一条流水线。
    验收门（--gates 默认）：
    - 参考 AI（买最便宜的可见升级 → 出战 → 火球打自动评分点 → 血量<30% 撤退）
      能推进到第 3 波且总击杀 ≥ 15、全场零 console.error；
@@ -8,61 +10,12 @@
    --stress：场面上 200 敌人压满，p95 < 8ms。
    运行：npm run sim（verify 链最后一环）。
    ========================================================================== */
-import * as BABYLON from '@babylonjs/core';
 import { CONFIG } from '../src/core/config';
 import { DIRECTOR } from '../src/core/director';
-import { gameEvents, type GameEvent } from '../src/core/events';
 import { gameRng } from '../src/core/rng';
-import { FX } from '../src/render/particles';
 import { Units } from '../src/render/entities/units';
 import { SPELLS } from '../src/render/skills';
-import { Mage } from '../src/render/mage';
-
-/* ------------------------------ 占位渲染环境 ------------------------------ */
-/* 粒子层与贴图用 1×1 占位替代（与 tests/harness.js 同思路）：
-   无 canvas/Image 的 node 环境里也能驱动完整粒子池。 */
-const PLACEHOLDER_TEXTURES = ['glow', 'spark', 'smoke', 'debris', 'ring', 'softDisc', 'slash',
-  'beamGlow', 'groundNoise', 'rune', 'fracture', 'star', 'vortex', 'crystal', 'blade',
-  'spearBlade', 'grandCircle', 'daylightGrass'] as const;
-const LAYER_BLENDS: Array<[string, 'add' | 'normal']> = [['glow', 'add'], ['spark', 'add'], ['smoke', 'normal'], ['debris', 'normal']];
-
-function installPlaceholderFx(scene: BABYLON.Scene, capacity = 512): void {
-  for (const name of PLACEHOLDER_TEXTURES) {
-    FX.textures[name] = BABYLON.RawTexture.CreateRGBATexture(
-      new Uint8Array([255, 255, 255, 255]), 1, 1, scene, false, false) as unknown as BABYLON.DynamicTexture;
-  }
-  for (const [name, blending] of LAYER_BLENDS) {
-    FX.layers[name] = new FX.PointLayer(scene, name, capacity, FX.textures[name], blending);
-  }
-}
-
-interface HeadlessGame {
-  engine: BABYLON.NullEngine;
-  scene: BABYLON.Scene;
-  mage: InstanceType<typeof Mage>;
-  camera: BABYLON.FreeCamera;
-  cinematic: { focus: unknown; intensity: number; shake: number; shakeEnabled: boolean };
-  time: number;
-  frameDt: number;
-  paused: boolean;
-}
-
-function createHeadlessGame(): HeadlessGame {
-  const errors: string[] = [];
-  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(' ')); };
-  const engine = new BABYLON.NullEngine();
-  const scene = new BABYLON.Scene(engine);
-  installPlaceholderFx(scene);
-  const game: HeadlessGame = {
-    engine, scene,
-    mage: new Mage(scene),
-    camera: new BABYLON.FreeCamera('simCam', new BABYLON.Vector3(0, 10, -48), scene),
-    cinematic: { focus: null, intensity: 0, shake: 0, shakeEnabled: false },
-    time: 0, frameDt: 0, paused: false,
-  };
-  game.mage.root.position.set(0, 0, CONFIG.FIELD.heroZ);
-  return game;
-}
+import { createHeadlessWorld, drainSimErrors, type HeadlessGame } from '../tests/helpers/headless';
 
 /* ------------------------------ 参考 AI 玩家 ------------------------------ */
 
@@ -116,24 +69,10 @@ function game_ref(): HeadlessGame { return GAME; }
 function run(): number {
   const stress = process.argv.includes('--stress');
   gameRng.reseed(20260929);
-  const game = createHeadlessGame();
-  GAME = game;
-  Units.bind(game as unknown as never);
-  DIRECTOR.bind(game as unknown as never);
-  DIRECTOR.bindWorld({
-    clearWorld: () => Units.clear(),
-    spawnEnemy: (defKey, x, z) => Units.spawnEnemy(defKey, x, z),
-    spawnAlly: (_key, _stats) => null, // 参考 AI 不招募；钩子仅为契约完整
-    allies: () => [],
-    aliveEnemies: () => Units.aliveEnemies(),
-    dyingCount: () => Units.dying.length,
-    resetSpells: () => SPELLS.reset(),
-    shake: () => {},
-    applyTheme: () => {},
-  });
+  const world = createHeadlessWorld();
+  GAME = world.game;
 
   const TICK = 1 / 60;
-  const drained: GameEvent[] = [];
   const tickMs: number[] = [];
   let steps = 0;
   const hardCapSteps = stress ? 60 * 120 : 60 * 60 * 8;   // 压力 2 分钟 / 正常至多 8 分钟模拟
@@ -144,15 +83,8 @@ function run(): number {
 
   const tickOnce = (): void => {
     const t0 = performance.now();
-    game.time += TICK;
-    FX.time = game.time;
-    DIRECTOR.update(TICK);
-    Units.update(TICK);
-    SPELLS.update(game as unknown as never, TICK);
-    FX.update(TICK);
-    game.mage.update(TICK, game.time, false);
+    world.tickOnce(TICK);
     tickMs.push(performance.now() - t0);
-    gameEvents.drain(drained);   // 排水保持架构行为；计数以 DIRECTOR 权威字段为准
     steps++;
   };
 
@@ -175,8 +107,9 @@ function run(): number {
   const p95 = percentile(tickMs, 0.95);
   const maxWave = DIRECTOR.record, kills = DIRECTOR.kills, goldEarned = DIRECTOR.gold;
   const totalRanks = Object.values(DIRECTOR.levels).reduce((a, b) => a + b, 0);
+  const errors = drainSimErrors();
   const summary = { mode: stress ? 'stress' : 'gates', steps, maxWave, kills, goldEarned, totalRanks,
-    p95: +p95.toFixed(3), errors: (globalThis as { __simErrors?: string[] }).__simErrors ?? [] };
+    p95: +p95.toFixed(3), errors };
 
   console.log(`[headless_sim] ${JSON.stringify(summary)}`);
   if (!stress) {
@@ -185,16 +118,10 @@ function run(): number {
     assert_(totalRanks >= 2, `应完成至少 2 阶营地购买（实际 ${totalRanks}）`);
   }
   assert_(p95 < (stress ? 8 : 2), `tick p95 应 < ${stress ? 8 : 2}ms（实际 ${p95.toFixed(3)}ms）`);
-  assert_(consoleErrors.length === 0, `零 console.error（实际 ${consoleErrors.length}）: ${consoleErrors.slice(0, 2)}`);
+  assert_(errors.length === 0, `零 console.error（实际 ${errors.length}）: ${errors.slice(0, 2)}`);
   return 0;
 
   function assert_(cond: boolean, msg: string): void { if (!cond) throw new Error(msg); }
 }
-
-/* console.error 捕获要在 import 前生效：particles/entities 不主动 error，
-   但异常隔离路径会。转发到数组供门禁断言。 */
-const consoleErrors: string[] = [];
-const origError = console.error.bind(console);
-console.error = (...args: unknown[]) => { consoleErrors.push(args.map(String).join(' ')); origError(...args); };
 
 process.exit(run());

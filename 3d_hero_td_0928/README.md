@@ -5,7 +5,8 @@ Babylon.js 3D 主动型增量防守游戏。新玩家从一颗火球开始，在
 ## 运行
 
 ```sh
-node dev/build.mjs
+npm install
+npm run build
 python3 -m http.server 8788 --bind 127.0.0.1
 # http://127.0.0.1:8788/legion-breaker.html
 ```
@@ -40,9 +41,7 @@ python3 -m http.server 8788 --bind 127.0.0.1
 
 MiMo Desktop 生成的草地彩色 albedo：
 
-- `dev/assets/daylight-grass.png`：512×512，构建时内联为 `__TEX_PNG.daylightGrass`。
-- `dev/assets-raw/daylight-grass-raw.png`：1024×1024 原始输出，保留平台水印。
-- `dev/assets-raw/prompts/daylight-grass.txt`：生成提示词。
+- `assets/daylight-grass.png`：512×512，构建时内联为 `TEX_PNG.daylightGrass`（生成素材见 `scripts/gen-textures.mjs`）。
 
 游戏内 tile 是 raw 的派生版本：全幅缩小后用邻近草地镜像补齐右下角水印区，避免平铺后满场水印印章（像素统计与天然草地方差一致）。它是**不透明彩色地表**，不是技能贴图的白色 RGB / alpha 蒙版。贴图解码前或失败时使用程序化地面回退。无缝平铺尚未严格验证，接缝若明显可再处理。
 
@@ -50,15 +49,17 @@ MiMo Desktop 生成的草地彩色 albedo：
 
 | 文件 | 职责 |
 | --- | --- |
-| `dev/config.js` | 法术、敌人、盟友、升级依赖、波次、战场主题的唯一配置来源与校验 |
-| `dev/director.js` | 营地 / 战斗 / 整备 / 败北状态机、经济、解锁、首次出战完成记录 |
-| `dev/skills.js` | 法术生命周期、解锁门控、购买后的魔弹与自动施法 |
-| `dev/entities.js` | 单位、交战、追踪弹、血条和资源回收 |
-| `dev/core.js` | 场景、英雄、光照、主题与后处理 |
-| `dev/particles.js` | 粒子池、程序化贴图、内联 PNG 解码 |
-| `dev/ui.js` / `page.html.src` | 营地成长、标题与结算、已解锁战斗 HUD |
-| `dev/main.js` | 输入与统一时间步 |
-| `dev/build.mjs` | 构建离线单文件 HTML |
+| `src/core/config.ts` | 法术、敌人、盟友、升级依赖、波次、战场主题的唯一配置来源与校验 |
+| `src/core/director.ts` | 营地 / 战斗 / 整备 / 败北状态机、经济、解锁、首次出战完成记录 |
+| `src/core/rules/` | 统一数值源（stats）与战斗策略纯函数（combat） |
+| `src/core/events.ts` | core → render 的类型化事件队列 |
+| `src/core/rng.ts` | 种子随机（战斗域可复现） |
+| `src/render/skills.ts` | 法术生命周期、解锁门控、购买后的魔弹与自动施法 |
+| `src/render/entities/` | 单位、交战、追踪弹、血条和资源回收 |
+| `src/render/scene.ts` / `mage.ts` | 场景、英雄、光照、主题与后处理 |
+| `src/render/particles.ts` | 粒子池、程序化贴图、内联 PNG 解码 |
+| `src/render/ui.ts` / `input.ts` | 营地成长、标题与结算、已解锁战斗 HUD、输入与统一时间步 |
+| `vite.config.ts` + `scripts/` | 构建离线单文件 HTML（`npm run build`） |
 
 - UI 和输入通过模块 API 操作，不直接改写游戏内部字典。
 - `ownsSpell/ownsAlly/ownsBolt` 判断能力所有权，`isUnlocked` 判断升级前置，二者不可混用。
@@ -69,14 +70,24 @@ MiMo Desktop 生成的草地彩色 albedo：
 - 场景共享材质不随单位释放；清场必须回到预热后的资源基线。
 - 战斗伤害可能中途触发清场，实体迭代保留存活与 rig 空值守卫。
 
+阶段 3 起的结构契约（`tests/architecture.test.ts` 强制）：
+
+- **core/render 硬分层**：`src/core/**` 零 Babylon、零 window/document、禁反向依赖 render；世界交互经 `DirectorWorld` 钩子注入（render 是唯一实现方）。
+- **事件队列**：core 只向 `gameEvents` 推类型化事件，render 每帧排水一次分发 UI；core 不再持有回调表。
+- **固定步长**：逻辑恒定 60Hz（每渲染帧至多 6 步、积压丢弃；看门狗补帧上限 180 步），平衡与帧率解耦。
+- **种子随机**：`?seed=<n>` 复现战斗随机；战斗域与表现域种子隔离，表现层粒子保持非种子随机。
+- **数值单源**：成长阶跃常量只存在于 `rules/stats.ts` 的 `STEPS`；实际战斗数值（`spellTuning`）与营地预览文案同源，`tests/rules.test.ts` 以 `current(lv+1) === next(lv)` 迁移一致性锁死。
+- **无头验收**：`npm run sim` 用参考 AI（买升级 → 出战 → 火球打评分点 → 低血撤退）完整下探并断言波次 / 击杀 / 购买与 tick p95 门禁；`npm run sim:stress` 为 200 敌压力模式。
+
 ## 测试
 
 ```sh
-node dev/build.mjs
-node --test tests/*.test.js
+npm run verify   # typecheck + 构建 + 测试 + 无头验收仿真
 ```
 
-测试包含配置与依赖校验、首次火球门控、营地购买状态、跨轮解锁保留、火球单独守住首波、自动化、无尽循环、头目、瘴蚀、法术和实体资源回收、构建幂等。构建测试会重新生成 `legion-breaker.html`，不是只读命令。
+- 表测试（`tests/*.test.ts`，node:test + tsx 直连 `src/`）：注册表校验与依赖环、战斗策略、数值同源、首次火球门控、营地购买状态矩阵、跨轮解锁保留、火球单独守住首波、自动化、无尽循环、头目、瘴蚀、法术和实体资源回收。
+- `tests/build.test.js`：构建产物自包含与幂等。它会重新生成 `legion-breaker.html`，不是只读命令。
+- `tools/headless_sim.ts`（`npm run sim`）：NullEngine 无头参考 AI 完整下探 + 性能门禁（共用骨架在 `tests/helpers/headless.ts`）。
 
 逻辑测试使用 Babylon NullEngine，不代替浏览器的布局、美术和输入检查。内嵌浏览器后台可能节流，不能把后台帧率作为真实前台性能基准。
 

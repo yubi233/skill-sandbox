@@ -8,9 +8,7 @@
     "build": "npm run gen:textures && vite build && node scripts/copy-artifact.mjs",
     "gen:textures": "node scripts/gen-textures.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/*.test.ts && node --test tests/*.test.js",
-    "test:legacy": "node --test tests/*.test.js",
-    "build:legacy": "node dev/build.mjs",
+    "test": "node --import tsx --test tests/*.test.ts && node --test tests/build.test.js",
     "verify": "npm run typecheck && npm run build && npm run test && npm run sim",
     "sim": "tsx tools/headless_sim.ts",
     "sim:stress": "tsx tools/headless_sim.ts --stress"

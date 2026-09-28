@@ -582,11 +582,11 @@ export const Units = {
   },
 };
 
-// TODO(阶段2末)：全部模块转换后移除此全局桥（dev/main.js / ui.js / skills.js 读取 window）
+// 调试手柄：保留为控制台探针入口（参考 survivors 的 window.__game；core 层禁 window 由门禁强制）（dev/main.js / ui.js / skills.js 读取 window）
 if (typeof window !== 'undefined') {
   (window as unknown as { Units: typeof Units }).Units = Units;
 }
-// TODO(阶段2末)：全部模块转换后移除此全局桥（dev/skills.js 的 SpellCast 继承此类）
+// 调试手柄：保留为控制台探针入口（参考 survivors 的 window.__game；core 层禁 window 由门禁强制）（dev/skills.js 的 SpellCast 继承此类）
 if (typeof window !== 'undefined') {
   (window as unknown as { ResourceOwner: typeof ResourceOwner }).ResourceOwner = ResourceOwner;
 }

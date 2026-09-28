@@ -579,6 +579,12 @@ function validate(): string[] {
   }
   if (!(TUNING.aggro > 0 && TUNING.projectileCap > 0 && TUNING.laneX.length === 3)) problems.push('TUNING 基本量非法');
     if (TUNING.camera.radius <= TUNING.camera.minRadius || TUNING.camera.minRadius <= 0) problems.push('TUNING.camera 半径区间非法');
+    for (const e of ENEMIES) {
+      if (!(KNOWN_UNIT_KEYS.enemy as readonly string[]).includes(e.key)) problems.push(`敌人 ${e.key} 未注册 rig 建模（KNOWN_UNIT_KEYS.enemy）`);
+    }
+    for (const a of ALLIES) {
+      if (!(KNOWN_UNIT_KEYS.ally as readonly string[]).includes(a.key)) problems.push(`盟友 ${a.key} 未注册 rig 建模（KNOWN_UNIT_KEYS.ally）`);
+    }
     for (const k of ['halfWidth', 'spawnZ', 'intermission', 'startGold'] as const) {
     if (!(FIELD[k] > 0)) problems.push('FIELD.' + k + ' 非法');
   }
@@ -627,6 +633,12 @@ export interface Config {
   upgradeCost: UpgradeCostFn;
   validate: ValidateFn;
 }
+
+/** 已注册单位键（render 侧 rigs 按此显式建模；新增单位必须同时登记，否则启动即报错） */
+export const KNOWN_UNIT_KEYS = {
+  enemy: ['grunt', 'runner', 'shield', 'lord', 'colossus', 'bishop'],
+  ally: ['guard', 'hunter'],
+} as const;
 
 const TUNING: TuningDef = {
   aggro: 4.2,

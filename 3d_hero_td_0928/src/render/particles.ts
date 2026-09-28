@@ -840,7 +840,7 @@ export const FX = {
   },
 };
 
-// TODO(阶段2末)：全部模块转换后移除此全局桥
+// 调试手柄：保留为控制台探针入口（参考 survivors 的 window.__game；core 层禁 window 由门禁强制）
 if (typeof window !== 'undefined') {
   (window as unknown as { FX: typeof FX }).FX = FX;
 }

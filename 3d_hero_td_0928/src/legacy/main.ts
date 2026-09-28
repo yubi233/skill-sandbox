@@ -5,7 +5,7 @@ import './babylon-globals';
 import '../render/particles';
 import '../core/config';
 import '../render/scene';
-import '../../dev/entities.js';
+import '../render/entities/units';
 import '../../dev/skills.js';
 import '../core/director';
 import '../../dev/ui.js';

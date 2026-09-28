@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#efe9dd">
+<title>死灵防线 · Legion Breaker 3D</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #292d29;
+    --muted: #65685e;
+    --quiet: #79796c;
+    --paper: #fffdf7;
+    --stone: #efe9dd;
+    --line: #d9d1bf;
+    --line-bright: #b8ae98;
+    --fire: #ad441c;
+    --fire-light: #f8e8d7;
+    --moss: #385b45;
+    --gold: #865d20;
+    --glass: rgba(255, 252, 242, .93);
+    --shadow: 0 12px 36px rgba(64, 54, 30, .09);
+    --safe-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #e7e2d3; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--ink); -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; }
+  button { color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 3px solid #256277; outline-offset: 4px; }
+  h1, h2, h3, h4, p, ul, dl, dd { margin: 0; }
+  [hidden] { display: none !important; }
+  kbd { font: inherit; font-variant-numeric: tabular-nums; }
+  .serif, #screen-title, #camp-title { font-family: "Iowan Old Style", "Palatino Linotype", "Songti SC", "STSong", Georgia, serif; }
+  .eyebrow { color: var(--gold); font-size: 10px; font-weight: 650; letter-spacing: 2.1px; line-height: 1.8; }
+  .glass {
+    background: var(--glass); border: 1px solid rgba(209, 199, 175, .9);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow);
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  #scene:focus-visible { outline: 3px solid #256277; outline-offset: -4px; }
+  #scene[inert] { pointer-events: none; }
+  #scene-shade {
+    position: fixed; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(239, 232, 212, .25), transparent 18%, transparent 76%, rgba(61, 66, 42, .12));
+  }
+
+  /* 战斗：只留下紧凑的浅色羊皮纸 HUD，中央战场保持通透。 */
+  #masthead {
+    position: fixed; top: max(14px, env(safe-area-inset-top)); left: 20px; right: 20px;
+    min-height: 66px; padding: 12px 20px; border-radius: 12px;
+    display: flex; align-items: center; gap: 24px; z-index: 20; pointer-events: none;
+  }
+  .brand { display: flex; align-items: center; gap: 13px; flex: 0 0 auto; }
+  .brand-mark { width: 25px; height: 25px; border: 1px solid #a77836; transform: rotate(45deg); display: grid; place-items: center; position: relative; }
+  .brand-mark::before { content: ''; width: 13px; height: 13px; border: 1px solid #c0a170; }
+  .brand-mark::after { content: ''; position: absolute; width: 5px; height: 5px; background: var(--fire); }
+  .brand-name { font-size: 14px; font-weight: 650; letter-spacing: 3px; }
+  .brand-sub { margin-top: 4px; color: var(--muted); font-size: 8px; letter-spacing: 1.4px; }
+  #top-mid { display: flex; flex-direction: column; gap: 4px; padding-left: 23px; border-left: 1px solid var(--line); }
+  #wave-label { font-size: 13px; font-weight: 650; letter-spacing: .5px; }
+  #phase-label { font-size: 10px; color: var(--muted); }
+  #hp-wrap { margin-left: auto; width: min(290px, 27vw); }
+  .hp-caption { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; font-size: 10px; color: var(--muted); }
+  #hp-nums { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #hp-nums b { font-weight: 700; color: var(--ink); }
+  #hp-frame { height: 7px; border-radius: 8px; background: #dedccc; overflow: hidden; }
+  #hp-fill { height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg, #4a7550, #84a16a); transition: width .18s; }
+  #hp-fill.low { background: linear-gradient(90deg, #a5482d, #d97a48); animation: hpPulse 1s infinite; }
+  @keyframes hpPulse { 50% { opacity: .65; } }
+  #blight-label { margin-top: 5px; color: #8d4a37; font-size: 9px; font-variant-numeric: tabular-nums; }
+  #top-right { text-align: right; padding-left: 24px; border-left: 1px solid var(--line); }
+  .gold-label { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+  #gold { font-size: 23px; line-height: 1.25; font-weight: 650; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .telemetry { position: fixed; left: 20px; bottom: 13px; color: #45533b; font-size: 9px; font-variant-numeric: tabular-nums; pointer-events: none; }
+  .telemetry b { font-weight: 500; }
+  #boss-bar {
+    position: fixed; top: 99px; left: 50%; transform: translateX(-50%); width: min(400px, 68vw);
+    z-index: 21; padding: 10px 16px; border-radius: 9px; pointer-events: none;
+  }
+  #boss-name { font-size: 11px; font-weight: 650; letter-spacing: 2px; color: #854b39; margin-bottom: 7px; text-align: center; }
+  #boss-frame { height: 6px; border-radius: 5px; overflow: hidden; background: #e6d6c9; }
+  #boss-fill { height: 100%; background: linear-gradient(90deg, #a44c32, #d58157); transition: width .12s; }
+  #banner {
+    position: fixed; top: 20%; left: 50%; transform: translate(-50%, -6px); z-index: 23;
+    width: max-content; max-width: 88vw; padding: 14px 28px; border: 1px solid rgba(220, 206, 175, .8); border-radius: 12px;
+    text-align: center; background: rgba(255, 251, 237, .91); box-shadow: var(--shadow);
+    opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none;
+  }
+  #banner.show { opacity: 1; transform: translate(-50%, 0); }
+  #banner-title { font-size: clamp(23px, 3vw, 34px); font-weight: 550; letter-spacing: 4px; }
+  #banner-sub { margin-top: 7px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+  #toast {
+    position: fixed; top: 104px; left: 50%; transform: translate(-50%, -5px); max-width: min(460px, 90vw);
+    padding: 12px 20px; z-index: 80; border-radius: 10px; background: #fffaf0; border: 1px solid #b7a780;
+    box-shadow: var(--shadow); font-size: 12px; line-height: 1.6; text-align: center;
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  /* 作战面板：技能选择固定左上，召唤/撤退/迎战固定右上，中央留给战场。 */
+  #skill-panel {
+    position: fixed; top: max(92px, calc(env(safe-area-inset-top) + 84px)); left: 20px;
+    padding: 10px 12px; border-radius: 12px; z-index: 20;
+  }
+  #action-panel {
+    position: fixed; top: max(92px, calc(env(safe-area-inset-top) + 84px)); right: 20px;
+    padding: 10px 12px; border-radius: 12px; z-index: 20;
+    display: flex; flex-direction: column; gap: 9px; align-items: stretch;
+  }
+  .dock-group { min-width: 0; }
+  .dock-sep { width: 1px; background: var(--line); margin: 4px 0; flex-shrink: 0; }
+  .dock-sep.h { width: auto; height: 1px; margin: 1px 0; }
+  .dock-caption { font-size: 9px; letter-spacing: 1.1px; color: var(--muted); margin-bottom: 7px; }
+  .slot-row { display: flex; gap: 7px; }
+  .slot {
+    width: 84px; height: 81px; padding: 7px 5px; position: relative; overflow: hidden;
+    border: 1px solid #d7cfba; border-radius: 9px; background: rgba(255, 255, 255, .63);
+    display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+    transition: border-color .16s, background .16s, transform .16s;
+  }
+  .slot:hover:not(:disabled) { border-color: #a99168; background: #fffdf7; transform: translateY(-2px); }
+  .slot.sel { border: 2px solid #b35c27; padding: 6px 4px; background: #fff0d9; box-shadow: 0 0 0 2px rgba(187, 113, 57, .1); }
+  .slot .key { position: absolute; left: 6px; top: 5px; min-width: 15px; text-align: center; font-size: 9px; line-height: 16px; color: #665138; background: #f2ece0; border: 1px solid #dfd3bd; border-radius: 4px; z-index: 2; }
+  .slot .glyph {
+    width: 25px; height: 25px; margin-top: 2px; border-radius: 50%; z-index: 2;
+    background: radial-gradient(circle at 38% 30%, #fff7d4 0%, var(--c) 45%, color-mix(in srgb, var(--c) 70%, #714528) 100%);
+    box-shadow: 0 3px 8px color-mix(in srgb, var(--c) 30%, transparent), inset 0 0 0 1px rgba(118, 72, 28, .2);
+  }
+  .slot .glyph.ally { border-radius: 7px 7px 12px 12px; width: 21px; }
+  .slot .nm { margin-top: 6px; font-size: 11px; font-weight: 600; z-index: 2; }
+  .slot .slot-status { margin-top: 4px; color: #626154; font-size: 9px; white-space: nowrap; font-variant-numeric: tabular-nums; z-index: 2; }
+  .slot.cooling .slot-status, .slot.summon.poor .slot-status { color: #944121; }
+  .slot.summon { width: 108px; }
+  .slot.summon:disabled { background: #efebe2; }
+  .slot.summon.full .slot-status { color: var(--moss); }
+  .slot .cd { position: absolute; inset: 0; pointer-events: none; background: rgba(196, 179, 142, .35); transform-origin: bottom; transform: scaleY(0); z-index: 1; }
+  #side-actions { display: flex; flex-direction: column; gap: 9px; justify-content: center; align-items: stretch; }
+  #bolt-status { color: var(--moss); font-size: 10px; text-align: center; }
+  .quiet-btn {
+    min-height: 40px; padding: 8px 13px; border: 1px solid #cdc2a8; border-radius: 7px;
+    background: #fffaf0; color: #4b5145; font-size: 11px; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .16s, border-color .16s;
+  }
+  .quiet-btn:hover:not(:disabled) { background: #f3ead9; border-color: #968665; }
+  .quiet-btn kbd { font-size: 10px; color: #6d6553; padding: 1px 4px; border: 1px solid #cfc3a9; border-radius: 3px; }
+  .retreat-note { text-align: center; font-size: 9px; color: var(--muted); }
+  #inter-bar {
+    display: flex; align-items: center; gap: 12px; padding: 1px 0;
+  }
+  #inter-label { font-size: 11px; }
+  #inter-count { font-size: 17px; font-weight: 650; color: var(--gold); font-variant-numeric: tabular-nums; min-width: 38px; }
+  #btn-next { background: #ede6d4; color: #5e4d2e; border-color: #c6b78e; }
+  #combat-hints {
+    position: fixed; left: 50%; bottom: var(--safe-bottom); transform: translateX(-50%);
+    display: flex; justify-content: center; gap: 15px; width: max-content; max-width: 94vw;
+    padding: 4px 10px; border-radius: 5px; color: #3e4a37; background: rgba(246, 241, 221, .86);
+    font-size: 9px; z-index: 18; pointer-events: none;
+  }
+  .control-hint { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .control-hint kbd { font-weight: 700; }
+
+  /* 营地：一个完整可交互的页面，研习卡直接放在页面内，不再被模态屏遮挡。 */
+  #camp-screen {
+    position: fixed; inset: 0; z-index: 40; overflow-y: auto; overscroll-behavior: contain;
+    background: radial-gradient(ellipse at 4% 16%, rgba(234, 198, 143, .26), transparent 48%),
+      radial-gradient(ellipse at 100% 80%, rgba(163, 185, 149, .16), transparent 45%), #f1ede2;
+    scrollbar-color: #b8ac91 #f1ede2; scrollbar-width: thin;
+  }
+  #camp-shell { width: min(1180px, calc(100% - 72px)); min-height: 100%; margin: 0 auto; padding: 28px 0 0; display: flex; flex-direction: column; }
+  .camp-masthead { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 4px 0 24px; border-bottom: 1px solid var(--line); }
+  .camp-wordmark { display: flex; align-items: center; gap: 14px; }
+  .camp-wordmark .brand-sub { margin: 0; font-size: 10px; letter-spacing: 2px; }
+  .camp-chapter { margin-top: 5px; color: var(--muted); font-size: 11px; }
+  .camp-purse { text-align: right; }
+  .camp-purse-label { display: block; font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .camp-purse strong { font-size: 27px; color: var(--gold); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .camp-purse small { font-size: 11px; color: var(--muted); margin-left: 6px; }
+  .camp-heading { padding: 27px 0 25px; }
+  #camp-title { font-size: clamp(30px, 3.8vw, 42px); line-height: 1.25; font-weight: 600; letter-spacing: 3px; width: fit-content; }
+  #camp-title:focus { outline: none; }
+  #camp-sub { margin-top: 10px; font-size: 13px; color: var(--muted); line-height: 1.8; }
+  .camp-workspace { flex: 1; display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: 26px; align-items: start; padding-bottom: 30px; }
+  .camp-sidebar { display: grid; gap: 18px; }
+  .paper-card { border: 1px solid var(--line); background: rgba(255, 253, 247, .87); border-radius: 15px; box-shadow: 0 5px 18px rgba(79, 65, 39, .03); }
+  #camp-return { padding: 22px; }
+  .section-label { font-size: 11px; letter-spacing: 1.3px; font-weight: 650; }
+  .camp-stats { margin-top: 17px; display: grid; gap: 13px; }
+  .camp-stats div { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+  .camp-stats dt { color: var(--muted); }
+  .camp-stats dd { font-weight: 650; font-variant-numeric: tabular-nums; }
+  .camp-aside-note { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.9; }
+  #camp-loadout-group { padding: 22px; }
+  #camp-loadout { list-style: none; padding: 0; margin-top: 19px; display: grid; gap: 19px; }
+  .loadout-item { display: flex; gap: 12px; align-items: center; }
+  .loadout-dot { width: 23px; height: 23px; flex-shrink: 0; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff2cf, var(--c) 67%); box-shadow: inset 0 0 0 1px rgba(101, 79, 38, .19); }
+  .loadout-item strong { display: block; font-size: 12px; font-weight: 650; }
+  .loadout-item div > span { display: block; margin-top: 4px; font-size: 10px; color: var(--muted); }
+  .first-visit .camp-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; }
+  #camp-onboarding { padding: 30px; position: relative; overflow: hidden; background: radial-gradient(ellipse at 75% 24%, #fff0d7, transparent 65%), #fffcf5; }
+  .starter-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .starter-tag { font-size: 10px; padding: 6px 9px; color: #904923; background: #f6e8d4; border: 1px solid #ead4b3; border-radius: 5px; }
+  .ember-art { position: relative; width: 144px; height: 144px; margin: 18px auto 19px; display: grid; place-items: center; }
+  .ember-art::before { content: ''; position: absolute; inset: 3px; border: 1px solid #d8bc89; border-radius: 50%; box-shadow: 0 0 0 10px rgba(213, 180, 119, .06), 0 0 0 24px rgba(219, 185, 129, .045); }
+  .ember-art::after { content: ''; position: absolute; inset: 21px; border: 1px dashed #e0c79d; border-radius: 50%; transform: rotate(-20deg); }
+  .ember-flame { width: 59px; height: 72px; transform: rotate(40deg); border-radius: 8% 64% 61% 65%; background: linear-gradient(135deg, #f6b45c 3%, #e5762e 50%, #ab371b); box-shadow: 0 8px 24px rgba(182, 85, 28, .21), inset 2px 2px 3px rgba(255, 225, 169, .7); position: relative; }
+  .ember-flame::after { content: ''; position: absolute; width: 25px; height: 38px; bottom: 9px; right: 10px; border-radius: 6% 64% 57% 62%; background: linear-gradient(135deg, #fff7c9, #ffc76b); }
+  #starter-name { text-align: center; font-size: 24px; font-weight: 650; letter-spacing: 2px; }
+  #starter-description { max-width: 355px; margin: 12px auto 20px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.9; }
+  .starter-metrics { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; font-size: 11px; color: #8a4d27; }
+  .starter-metrics span + span { border-left: 1px solid #dfceb2; padding-left: 12px; }
+  .starter-control { margin-top: 24px; padding-top: 19px; border-top: 1px solid #e6d9c3; font-size: 12px; line-height: 1.9; text-align: center; color: var(--muted); }
+  .starter-control kbd { padding: 2px 7px; border: 1px solid #ccba96; border-radius: 4px; background: #fffcf4; color: #6e4d26; }
+  #camp-first-guide { padding: 30px 0 20px; }
+  .guide-title { margin: 10px 0 27px; font-size: 25px; font-weight: 550; letter-spacing: 1px; }
+  .guide-steps { list-style: none; padding: 0; display: grid; gap: 25px; }
+  .guide-steps li { display: flex; gap: 17px; }
+  .step-number { flex-shrink: 0; color: #93723e; font-size: 12px; letter-spacing: 1px; padding-top: 3px; }
+  .guide-steps strong { font-size: 14px; font-weight: 650; }
+  .guide-steps p { margin-top: 7px; max-width: 370px; color: var(--muted); font-size: 12px; line-height: 1.9; }
+  .guide-note { margin-top: 28px; padding: 16px 18px; border-left: 2px solid #ae8d55; background: rgba(230, 220, 199, .45); border-radius: 0 7px 7px 0; font-size: 11px; color: #675a40; line-height: 1.9; }
+  #upgrade-panel { min-width: 0; }
+  #upgrade-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 12px; }
+  #upgrade-title { font-size: 19px; font-weight: 600; letter-spacing: 1.5px; }
+  .upgrade-kicker { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+  #upgrade-summary { font-size: 11px; color: var(--moss); font-weight: 650; text-align: right; }
+  #camp-milestone { padding: 11px 14px; margin-bottom: 21px; border: 1px solid #d9cfb9; border-radius: 8px; background: #eae4d4; color: #635632; font-size: 11px; line-height: 1.8; }
+  .upgrade-branch + .upgrade-branch { margin-top: 27px; }
+  .branch-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: #585b4e; font-size: 11px; font-weight: 650; letter-spacing: 2px; }
+  .branch-title::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: var(--branch); border: 1px solid rgba(95, 89, 55, .16); transform: rotate(45deg); }
+  .branch-title::after { content: ''; height: 1px; background: var(--line); flex: 1; }
+  .upgrade-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .upgrade-card { min-width: 0; padding: 20px; border: 1px solid #d8d0be; border-radius: 12px; background: #fcfaf4; display: flex; flex-direction: column; transition: border-color .16s, box-shadow .16s; }
+  .upgrade-card.affordable { border-color: #c0a472; background: #fffdf7; box-shadow: 0 4px 16px rgba(104, 76, 31, .055); }
+  .upgrade-card.affordable:hover { border-color: #a98245; box-shadow: 0 6px 22px rgba(104, 76, 31, .10); }
+  .upgrade-card.maxed { background: #f0f1e7; border-color: #c6cebb; }
+  .upgrade-card.locked { background: #efebe2; }
+  .upgrade-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .upgrade-name { font-size: 16px; font-weight: 650; line-height: 1.6; }
+  .upgrade-rank { color: #6b604b; background: #ede7d9; border-radius: 4px; padding: 4px 7px; font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .upgrade-applies { margin-top: 6px; font-size: 10px; color: var(--gold); line-height: 1.8; }
+  .upgrade-description { margin-top: 11px; color: var(--muted); font-size: 11px; line-height: 1.85; min-height: 41px; }
+  .upgrade-effects { display: grid; grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr); align-items: center; gap: 9px; margin: 16px 0 11px; padding: 12px; border-radius: 7px; background: #f1ede2; }
+  .effect-label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 9px; }
+  .upgrade-effects strong { display: block; font-size: 12px; font-weight: 600; line-height: 1.7; overflow-wrap: anywhere; }
+  .upgrade-effects > div:last-child strong { color: #85441f; }
+  .effect-arrow { color: #9d8965; font-size: 16px; }
+  .upgrade-milestone { padding-bottom: 18px; color: var(--muted); font-size: 10px; line-height: 1.7; }
+  .upgrade-purchase { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
+  .upgrade-cost { color: #80571f; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .buy-btn { min-height: 39px; padding: 8px 14px; border: 1px solid #926c34; border-radius: 6px; background: #836331; color: #fffdf5; font-size: 11px; font-weight: 650; }
+  .buy-btn:hover:not(:disabled) { background: #6a4d25; }
+  .buy-btn:disabled { border-color: #d4cdbd; color: #706c61; background: #e8e4d9; font-weight: 500; }
+  .maxed .buy-btn:disabled { color: #4d6247; background: #e1e8d8; border-color: #c4cdb6; }
+  .upgrade-availability { min-height: 16px; margin-top: 9px; font-size: 10px; line-height: 1.7; color: var(--muted); }
+  .affordable .upgrade-availability { color: var(--moss); }
+  .camp-footer {
+    position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 19px 0 max(21px, env(safe-area-inset-bottom)); border-top: 1px solid #cfc4ac;
+    background: rgba(241, 237, 226, .97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  }
+  #camp-footer-title { font-size: 14px; font-weight: 650; }
+  #camp-footer-note { margin-top: 7px; font-size: 11px; color: var(--muted); line-height: 1.7; }
+  .primary-btn {
+    min-height: 50px; padding: 14px 27px; border: 1px solid #994019; border-radius: 8px;
+    background: linear-gradient(110deg, #b34c20, #9a3c19); color: #fff8e9; font-size: 13px; font-weight: 650; letter-spacing: 1.3px;
+    box-shadow: 0 5px 14px rgba(145, 62, 24, .14); transition: background .16s, transform .16s, box-shadow .16s;
+  }
+  .primary-btn:hover:not(:disabled) { background: linear-gradient(110deg, #a34019, #863113); transform: translateY(-1px); box-shadow: 0 7px 18px rgba(145, 62, 24, .19); }
+  .primary-btn:active:not(:disabled) { transform: translateY(0); }
+  #camp-start { flex-shrink: 0; min-width: 234px; }
+
+  /* 标题与败北：浅石色面板，柔和的景深，不再使用全黑遮罩。 */
+  #screen {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; overflow-y: auto; padding: 32px 20px;
+    background: linear-gradient(110deg, rgba(239, 232, 211, .61), rgba(226, 231, 211, .35));
+    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+  }
+  #screen-card {
+    width: min(510px, 100%); padding: 38px 42px 32px; border: 1px solid #d6cbb2; border-radius: 20px; text-align: center;
+    background: radial-gradient(ellipse at 50% 0, #ffefcf, transparent 72%), rgba(255, 252, 243, .98); box-shadow: 0 25px 75px rgba(68, 66, 43, .17);
+  }
+  .screen-emblem { width: 84px; height: 84px; margin: 3px auto 28px; }
+  .screen-emblem::before { inset: 0; box-shadow: 0 0 0 8px rgba(219, 185, 129, .07); }
+  .screen-emblem::after { inset: 12px; }
+  .screen-emblem .ember-flame { width: 34px; height: 43px; }
+  .screen-emblem .ember-flame::after { width: 14px; height: 22px; bottom: 6px; right: 6px; }
+  #screen-kicker { font-size: 9px; letter-spacing: 2.2px; color: var(--gold); }
+  #screen-title { font-size: clamp(34px, 6vw, 46px); font-weight: 550; letter-spacing: 7px; margin: 13px 0 19px; }
+  #screen-sub { font-size: 13px; line-height: 2; color: var(--muted); white-space: pre-line; }
+  #screen-tip { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e0d7c4; color: var(--muted); font-size: 11px; letter-spacing: .6px; line-height: 1.9; }
+  #screen-action { margin-top: 24px; width: 100%; }
+  .screen-footer { margin-top: 20px; color: #7a7768; font-size: 9px; letter-spacing: 2.5px; }
+  #screen-results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 27px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  #screen-results dt { font-size: 10px; color: var(--muted); }
+  #screen-results dd { margin-top: 7px; font-size: 24px; color: #71552d; font-weight: 600; font-variant-numeric: tabular-nums; }
+  body[data-surface="defeat"] #screen-card { background: radial-gradient(ellipse at 50% 0, #f5e5d3, transparent 72%), #faf7ee; }
+
+  @media (min-width: 1500px) { #camp-shell { padding-top: 40px; } .camp-heading { padding: 34px 0; } }
+  @media (max-width: 1050px) {
+    #camp-shell { width: calc(100% - 44px); }
+    .camp-workspace { grid-template-columns: 220px minmax(0, 1fr); gap: 20px; }
+    .upgrade-card { padding: 16px; }
+    .upgrade-name { font-size: 14px; }
+    .upgrade-rank { padding: 4px 5px; font-size: 9px; }
+    .upgrade-effects { gap: 6px; padding: 10px; }
+    #masthead { gap: 18px; }
+    #masthead .brand { display: none; }
+    #top-mid { padding-left: 0; border-left: 0; }
+    #hp-wrap { width: min(310px, 38vw); }
+    .telemetry { display: none; }
+  }
+  @media (max-width: 820px) {
+    .camp-workspace { grid-template-columns: 1fr; }
+    .camp-sidebar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .first-visit .camp-sidebar { display: block; }
+    .first-visit .camp-workspace { gap: 24px; }
+    #camp-onboarding { padding: 24px; }
+    #camp-first-guide { padding-top: 18px; }
+    .guide-title { font-size: 21px; }
+    .guide-steps { gap: 21px; }
+    .guide-steps li { gap: 11px; }
+    .guide-steps strong { font-size: 13px; }
+    .guide-note { margin-top: 20px; }
+    #camp-return, #camp-loadout-group { padding: 19px; }
+    #camp-loadout { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .loadout-item { gap: 8px; }
+    .loadout-dot { width: 18px; height: 18px; }
+    #skill-panel, #action-panel { padding: 8px 9px; }
+    .slot { width: 69px; }
+    .slot.summon { width: 92px; }
+    .slot.summon .slot-status { font-size: 8px; }
+    .quiet-btn { padding: 8px 10px; }
+    #combat-hints { gap: 10px; font-size: 8px; }
+  }
+  @media (max-width: 600px) {
+    #camp-shell { width: calc(100% - 32px); padding-top: 18px; }
+    .camp-masthead { padding-bottom: 17px; }
+    .camp-wordmark .brand-sub { font-size: 8px; letter-spacing: 1.5px; }
+    .camp-chapter { font-size: 10px; }
+    .camp-purse strong { font-size: 23px; }
+    .camp-heading { padding: 24px 0; }
+    #camp-title { font-size: 31px; }
+    #camp-sub { font-size: 12px; }
+    .camp-workspace, .first-visit .camp-workspace { display: flex; flex-direction: column; gap: 23px; }
+    .camp-sidebar, .first-visit .camp-sidebar { width: 100%; }
+    #camp-onboarding { padding: 22px; }
+    .ember-art { width: 116px; height: 116px; margin: 18px auto; }
+    .ember-flame { width: 46px; height: 57px; }
+    .ember-flame::after { width: 21px; height: 32px; bottom: 8px; right: 8px; }
+    #starter-name { font-size: 22px; }
+    #camp-first-guide { padding-top: 0; }
+    .guide-title { margin: 7px 0 19px; }
+    .guide-steps { gap: 18px; }
+    .camp-sidebar { display: grid; gap: 12px; grid-template-columns: 1fr; }
+    .camp-stats { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .camp-stats div { display: block; font-size: 11px; }
+    .camp-stats dd { margin-top: 7px; }
+    .camp-aside-note { margin-top: 14px; padding-top: 13px; }
+    #camp-loadout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .upgrade-grid { grid-template-columns: 1fr; }
+    .upgrade-card { padding: 20px; }
+    .upgrade-name { font-size: 16px; }
+    .upgrade-description { min-height: 0; }
+    .upgrade-effects strong { font-size: 13px; }
+    #upgrade-panel { width: 100%; }
+    #upgrade-head { gap: 10px; }
+    #upgrade-summary { max-width: 100px; line-height: 1.7; }
+    .camp-footer { flex-direction: column; align-items: stretch; gap: 13px; padding: 14px 0 max(16px, env(safe-area-inset-bottom)); }
+    #camp-footer-title { font-size: 12px; }
+    #camp-footer-note { font-size: 10px; margin-top: 4px; }
+    #camp-start { min-width: 0; width: 100%; }
+    #masthead { left: 10px; right: 10px; top: max(10px, env(safe-area-inset-top)); gap: 12px; padding: 10px 12px; min-height: 68px; }
+    #top-mid { flex: 1; }
+    #wave-label { font-size: 11px; }
+    #phase-label { display: none; }
+    #hp-wrap { width: 35%; }
+    .hp-caption { font-size: 9px; }
+    .hp-caption > span:first-child { display: none; }
+    #blight-label { font-size: 8px; white-space: nowrap; }
+    #top-right { padding-left: 11px; }
+    #gold { font-size: 19px; }
+    #boss-bar { top: 91px; }
+    #banner { top: 24%; padding: 12px 16px; }
+    #banner-title { font-size: 22px; letter-spacing: 2px; }
+    #banner-sub { font-size: 10px; }
+    #toast { top: 93px; font-size: 11px; }
+    #skill-panel { left: 10px; max-width: calc(54vw - 14px); overflow-x: auto; }
+    #action-panel { right: 10px; max-width: calc(46vw - 14px); }
+    #skill-panel .dock-group, #side-actions { flex-shrink: 0; }
+    .dock-caption { font-size: 8px; }
+    .slot { width: 60px; height: 73px; }
+    .slot.summon { width: 87px; }
+    .slot .glyph { width: 21px; height: 21px; }
+    .slot .nm { font-size: 10px; }
+    .slot .key { font-size: 8px; min-width: 13px; line-height: 13px; left: 4px; top: 4px; }
+    #side-actions .quiet-btn { font-size: 10px; padding: 8px; }
+    #combat-hints { max-width: calc(100vw - 20px); overflow: hidden; justify-content: flex-start; }
+    #inter-bar { gap: 8px; white-space: nowrap; }
+    #inter-label { font-size: 10px; }
+    #inter-count { font-size: 14px; }
+    #screen { padding: 22px 16px; }
+    #screen-card { padding: 30px 26px 27px; }
+    .screen-emblem { width: 76px; height: 76px; margin: 0 auto 27px; }
+    #screen-title { font-size: 37px; letter-spacing: 5px; }
+  }
+  @media (max-height: 680px) and (min-width: 821px) {
+    #camp-shell { padding-top: 18px; }
+    .camp-masthead { padding-bottom: 15px; }
+    .camp-heading { padding: 20px 0; }
+    #camp-title { font-size: 32px; }
+    #camp-onboarding { padding: 23px; }
+    .ember-art { width: 112px; height: 112px; margin: 12px auto; }
+    .starter-control { margin-top: 17px; padding-top: 13px; }
+    .camp-footer { padding-top: 14px; padding-bottom: 15px; }
+    #screen-card { padding-top: 27px; padding-bottom: 24px; }
+    .screen-emblem { width: 70px; height: 70px; margin: 0 auto 20px; }
+    #screen-title { font-size: 38px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body data-surface="title">
+  <canvas id="scene" aria-label="死灵防线战场，选择已掌握的法术后点击释放" tabindex="-1" inert aria-hidden="true"></canvas>
+  <div id="scene-shade" aria-hidden="true"></div>
+
+  <div id="combat-ui" hidden inert aria-hidden="true">
+    <header id="masthead" class="glass">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div><p class="brand-name">死灵防线</p><p class="brand-sub">LEGION BREAKER</p></div>
+      </div>
+      <div id="top-mid"><span id="wave-label">第 1 波 · 守住防线</span><span id="phase-label">选择法术，守住防线</span></div>
+      <div id="hp-wrap">
+        <div class="hp-caption"><span>防线生命</span><span id="hp-nums"><b id="hp-num">100</b> / <span id="hp-max">100</span></span></div>
+        <div id="hp-frame" role="progressbar" aria-label="防线生命" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><div id="hp-fill"></div></div>
+        <p id="blight-label" hidden></p>
+      </div>
+      <div id="top-right"><div class="gold-label">金币</div><div id="gold">0</div></div>
+    </header>
+    <div class="telemetry" aria-hidden="true"><b id="hud-fps">—</b> FPS · 粒子 <b id="hud-particles">0</b></div>
+    <div id="boss-bar" class="glass" hidden inert>
+      <div id="boss-name"></div><div id="boss-frame" role="progressbar" aria-label="头目生命" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><div id="boss-fill"></div></div>
+    </div>
+    <div id="banner" role="status" aria-live="polite" aria-atomic="true"><h2 id="banner-title"></h2><p id="banner-sub"></p></div>
+    <section id="skill-panel" class="glass" aria-label="已掌握法术">
+      <div class="dock-caption" id="spell-caption">已掌握法术 · 点击战场释放</div>
+      <div id="spellbar" class="slot-row" role="group" aria-labelledby="spell-caption"></div>
+    </section>
+    <section id="action-panel" class="glass" aria-label="其他操作">
+      <div class="dock-group" id="summon-group" hidden inert>
+        <div class="dock-caption" id="summon-caption">军团召唤 · 消耗金币</div>
+        <div id="summonbar" class="slot-row" role="group" aria-labelledby="summon-caption"></div>
+      </div>
+      <div class="dock-sep h" id="summon-sep" aria-hidden="true" hidden></div>
+      <div id="side-actions">
+        <span id="bolt-status" hidden></span>
+        <button type="button" class="quiet-btn retreat" id="btn-retreat" aria-keyshortcuts="R" disabled>撤退回营 <kbd>R</kbd></button>
+        <span class="retreat-note">金币与能力保留</span>
+      </div>
+      <div class="dock-sep h" aria-hidden="true"></div>
+      <div id="inter-bar" hidden inert aria-hidden="true">
+        <span id="inter-label">下一波来袭</span><span id="inter-count">—</span>
+        <button type="button" class="quiet-btn" id="btn-next" aria-keyshortcuts="N" disabled>立即迎战 <kbd>N</kbd></button>
+      </div>
+    </section>
+    <div id="combat-hints" aria-label="当前操作提示"></div>
+  </div>
+
+  <main id="camp-screen" aria-labelledby="camp-title" hidden inert aria-hidden="true">
+    <div id="camp-shell" class="first-visit">
+      <header class="camp-masthead">
+        <div class="camp-wordmark"><span class="brand-mark" aria-hidden="true"></span><div><p class="brand-sub">LEGION BREAKER</p><p class="camp-chapter">火种长明 · 营地手记</p></div></div>
+        <div class="camp-purse"><span class="camp-purse-label">随身金币 · 跨次出战保留</span><strong id="camp-gold">0</strong><small>金</small></div>
+      </header>
+      <div class="camp-heading"><h1 id="camp-title" tabindex="-1">余烬营地</h1><p id="camp-sub"></p></div>
+      <div class="camp-workspace">
+        <aside class="camp-sidebar" aria-label="出发准备">
+          <section id="camp-onboarding" class="paper-card" aria-labelledby="starter-name">
+            <div class="starter-head"><p class="eyebrow">YOUR FIRST SPELL</p><span class="starter-tag">初始已掌握</span></div>
+            <div class="ember-art" aria-hidden="true"><span class="ember-flame"></span></div>
+            <h2 id="starter-name">火球术</h2><p id="starter-description"></p>
+            <div class="starter-metrics"><span id="starter-damage"></span><span id="starter-cooldown"></span></div>
+            <p class="starter-control">按 <kbd id="starter-key">1</kbd> 选择 · 点击敌群落点释放<br>也可按 <kbd>空格</kbd> 自动锁定施法</p>
+          </section>
+          <section id="camp-return" class="paper-card" aria-labelledby="camp-journal-title" hidden inert>
+            <h2 id="camp-journal-title" class="section-label">下探手记</h2>
+            <dl class="camp-stats">
+              <div><dt>最深纪录</dt><dd id="camp-record">—</dd></div>
+              <div><dt>历次归来</dt><dd id="camp-delves">—</dd></div>
+              <div><dt>出发时生命</dt><dd id="camp-hp">—</dd></div>
+            </dl>
+            <p class="camp-aside-note">金币与研习在本页会话中保留。<br>每次从第 1 波重新出发。当前未存档，刷新页面会重新开始。</p>
+          </section>
+          <section id="camp-loadout-group" class="paper-card" aria-labelledby="camp-loadout-title" hidden inert>
+            <h2 id="camp-loadout-title" class="section-label">已掌握的力量</h2><ul id="camp-loadout"></ul>
+          </section>
+        </aside>
+        <section id="camp-first-guide" aria-labelledby="guide-title">
+          <p class="eyebrow">A SMALL FLAME. A NEW BEGINNING.</p><h2 class="guide-title serif" id="guide-title">先守住第一道防线</h2>
+          <ol class="guide-steps">
+            <li><span class="step-number" aria-hidden="true">01</span><div><strong>把火球落在敌群中央</strong><p>火球会炸开一片区域。冷却结束后继续施法，不要让亡灵靠近你。</p></div></li>
+            <li><span class="step-number" aria-hidden="true">02</span><div><strong>击退亡灵，带回金币</strong><p>守住一波就能继续深入。瘴蚀会持续消耗生命，按 R 可随时撤退回营。</p></div></li>
+            <li><span class="step-number" aria-hidden="true">03</span><div><strong>归来之后，再学新的力量</strong><p>第一次只需专心施放火球。回到这里后，才会开放永久研习。</p></div></li>
+          </ol>
+          <p class="guide-note">不必一次走得很远。败北也保留金币。当前未存档，刷新页面会重新开始。</p>
+        </section>
+        <section id="upgrade-panel" aria-labelledby="upgrade-title" hidden inert aria-hidden="true">
+          <div id="upgrade-head"><div><h2 id="upgrade-title">营地研习</h2><p class="upgrade-kicker">一次投资，一步成长。新的研习随掌握的能力逐步出现。</p></div><span id="upgrade-summary"></span></div>
+          <p id="camp-milestone"></p>
+          <div id="upgrade-list"></div>
+        </section>
+      </div>
+      <footer class="camp-footer">
+        <div><p id="camp-footer-title">目标：用火球守住第一波</p><p id="camp-footer-note">从第 1 波出发 · 败北或撤退都会保留金币与能力</p></div>
+        <button type="button" class="primary-btn" id="camp-start" disabled>开始首次下探 →</button>
+      </footer>
+    </div>
+  </main>
+
+  <section id="screen" role="dialog" aria-modal="true" aria-labelledby="screen-title" aria-describedby="screen-sub" hidden inert aria-hidden="true">
+    <div id="screen-card">
+      <div class="ember-art screen-emblem" aria-hidden="true"><span class="ember-flame"></span></div>
+      <p id="screen-kicker">LEGION BREAKER · 3D</p><h1 id="screen-title">死灵防线</h1><p id="screen-sub"></p>
+      <dl id="screen-results" hidden inert>
+        <div><dt>抵达波次</dt><dd id="result-wave">—</dd></div>
+        <div><dt>本次击杀</dt><dd id="result-kills">—</dd></div>
+        <div><dt>保留金币</dt><dd id="result-gold">—</dd></div>
+      </dl>
+      <p id="screen-tip"></p><button type="button" class="primary-btn" id="screen-action" disabled>走进余烬营地 →</button>
+      <p class="screen-footer">守住防线，让火种延续</p>
+    </div>
+  </section>
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script type="module" src="/src/legacy/main.ts"></script>
+</body>
+</html>

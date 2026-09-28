@@ -6,7 +6,7 @@ import '../render/particles';
 import '../core/config';
 import '../render/scene';
 import '../render/entities/units';
-import '../../dev/skills.js';
+import '../render/skills';
 import '../core/director';
 import '../../dev/ui.js';
 import '../../dev/main.js';

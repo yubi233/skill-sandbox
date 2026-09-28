@@ -200,6 +200,20 @@ export function buildAllyRig(scene: BABYLON.Scene, def: AllyDef): AllyRig {
     spear.position.set(0, -0.30, 0.12); spear.material = steel; spear.parent = arm;
     const tip = BABYLON.MeshBuilder.CreateCylinder(nid('tip'), { height: 0.18, diameterTop: 0, diameterBottom: 0.07, tessellation: 5 }, scene);
     tip.position.set(0, 0.68, 0.12); tip.material = steel; tip.parent = arm;
+  } else if (def.key === 'hunter') {
+    const hood = BABYLON.MeshBuilder.CreateSphere(nid('hood'), { diameter: 0.34, segments: 8, slice: 0.62 }, scene);
+    hood.position.y = 1.38; hood.rotation.x = -0.18; parts.push(hood);
+    const cloak = BABYLON.MeshBuilder.CreateCylinder(nid('cloak'), { diameterTop: 0.40, diameterBottom: 0.62, height: 0.78, tessellation: 10 }, scene);
+    cloak.position.y = 0.62; parts.push(cloak);
+    const quiver = BABYLON.MeshBuilder.CreateCylinder(nid('quiver'), { height: 0.36, diameter: 0.10, tessellation: 6 }, scene);
+    quiver.position.set(-0.16, 1.02, -0.14); quiver.rotation.z = 0.35; parts.push(quiver);
+    const limb = BABYLON.MeshBuilder.CreateCapsule(nid('hArm'), { height: 0.46, radius: 0.045, tessellation: 6 }, scene);
+    limb.position.y = -0.20; limb.material = steel; limb.parent = arm;
+    const bow = BABYLON.MeshBuilder.CreateTorus(nid('bow'), { diameter: 0.66, thickness: 0.028, tessellation: 12 }, scene); // 原文含 arc:0.62，本版 CreateTorus 不读取该参数（无效项，去除）
+    bow.position.set(0, -0.34, 0.14); bow.rotation.y = Math.PI / 2; bow.rotation.z = Math.PI * 0.19;
+    bow.material = trim; bow.parent = arm;
+    const string = BABYLON.MeshBuilder.CreateCylinder(nid('string'), { height: 0.62, diameter: 0.008, tessellation: 3 }, scene);
+    string.position.set(0, -0.34, 0.10); string.material = trim; string.parent = arm;
   } else {
     throw new Error(`未注册的盟友 rig: ${def.key}（请在 KNOWN_UNIT_KEYS.ally 与 buildAllyRig 中登记）`);
   }

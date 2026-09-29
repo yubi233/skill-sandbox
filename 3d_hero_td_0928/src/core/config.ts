@@ -648,7 +648,7 @@ const TUNING: TuningDef = {
   projectileCap: 96,
   swingDuration: 0.34,
   flashDuration: 0.14,
-  unitScale: 1.8,
+  unitScale: 1,   // 整体比例风格：单位保持原始比例，整体放大交给镜头
   laneX: [-7, 0, 7],
   camera: { beta: 0.7, radius: 74, minRadius: 56, maxRadius: 92, fov: 0.86, targetZ: -4 },
   post: { bloomThreshold: 0.9, bloomWeight: 0.3, exposure: 0.93, contrast: 1.05 },

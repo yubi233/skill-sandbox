@@ -6,6 +6,7 @@
    不随迁移删除。
    ========================================================================== */
 
+import { Vector3, Matrix, Viewport } from '@babylonjs/core';
 import { CONFIG } from '../core/config';
 import { DIRECTOR } from '../core/director';
 
@@ -13,4 +14,5 @@ if (typeof window !== 'undefined') {
   const w = window as unknown as Record<string, unknown>;
   w.CONFIG = CONFIG;
   w.DIRECTOR = DIRECTOR;
+  w.BABYLON = { Vector3, Matrix, Viewport };   // 探针投影所需最小集
 }

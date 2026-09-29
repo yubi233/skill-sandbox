@@ -425,7 +425,7 @@ export const Units = {
     const victims: Enemy[] = [];
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      const bodyR = 0.35 + (e.def.scale || 1) * 0.35;
+      const bodyR = (0.35 + (e.def.scale || 1) * 0.35) * CONFIG.TUNING.unitScale;   // 所见即所判：判定体随视觉放大
       const d = Math.hypot(e.x - x, e.z - z);
       if (d <= radius + bodyR) {
         e.takeDamage(damage);

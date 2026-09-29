@@ -3,7 +3,7 @@
    · 模块级 nid/uid 命名计数器（原 IIFE 顶部定义，全实体共享，由本模块持有）
    ========================================================================== */
 import * as BABYLON from '@babylonjs/core';
-import type { EnemyDef, AllyDef } from '../../core/config';
+import { CONFIG, type EnemyDef, type AllyDef } from '../../core/config';
 
 const C3 = BABYLON.Color3;
 
@@ -89,6 +89,7 @@ export function buildEnemyRig(scene: BABYLON.Scene, def: EnemyDef): EnemyRig {
   const visual = new BABYLON.TransformNode(nid('enemyVisual'), scene);
   visual.parent = root;
   visual.scaling.setAll(s);
+  root.scaling.setAll(CONFIG.TUNING.unitScale);   // 阶段3e：全局单位放大
   const bone = boneMat(scene, def.color);
   const eye = eyeMat(scene, def.eye);
 
@@ -163,7 +164,7 @@ export function buildEnemyRig(scene: BABYLON.Scene, def: EnemyDef): EnemyRig {
     guard.position.set(0, -0.5, 0.1); guard.material = bone; guard.parent = arm;
   }
 
-  return { root, visual, arm, bodyMesh, eyeMesh, height: 1.9 * s };
+  return { root, visual, arm, bodyMesh, eyeMesh, height: 1.9 * s * CONFIG.TUNING.unitScale };
 }
 
 /* ------------------------------ 圣光军团机体 ------------------------------ */
@@ -220,5 +221,7 @@ export function buildAllyRig(scene: BABYLON.Scene, def: AllyDef): AllyRig {
 
   const bodyMesh = mergeParts(parts, steel, scene, visual);
   const trimMesh = trims.length ? mergeParts(trims, trim, scene, visual) : null;
-  return { root, visual, arm, bodyMesh, trimMesh, height: 1.85 };
+  const S = CONFIG.TUNING.unitScale;
+  root.scaling.setAll(S);
+  return { root, visual, arm, bodyMesh, trimMesh, height: 1.85 * S };
 }

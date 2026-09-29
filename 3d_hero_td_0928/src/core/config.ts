@@ -577,7 +577,7 @@ function validate(): string[] {
   for (const b of BOSS_ROTATION) {
     if (!enemyOf(b) || !enemyOf(b)?.boss) problems.push('BOSS_ROTATION 引用非 Boss 敌人: ' + b);
   }
-  if (!(TUNING.aggro > 0 && TUNING.projectileCap > 0 && TUNING.laneX.length === 3)) problems.push('TUNING 基本量非法');
+  if (!(TUNING.aggro > 0 && TUNING.projectileCap > 0 && TUNING.laneX.length === 3 && TUNING.unitScale >= 1)) problems.push('TUNING 基本量非法');
     if (TUNING.camera.radius <= TUNING.camera.minRadius || TUNING.camera.minRadius <= 0) problems.push('TUNING.camera 半径区间非法');
     for (const e of ENEMIES) {
       if (!(KNOWN_UNIT_KEYS.enemy as readonly string[]).includes(e.key)) problems.push(`敌人 ${e.key} 未注册 rig 建模（KNOWN_UNIT_KEYS.enemy）`);
@@ -605,6 +605,7 @@ export interface TuningDef {
   projectileCap: number;      // 追踪弹池上限（溢出复用最旧槽位）
   swingDuration: number;      // 挥击动画时长
   flashDuration: number;      // 受击闪红时长
+  unitScale: number;          // 单位模型视觉放大（不改判定数值，仅外观）
   laneX: number[];            // 三路中心线（唯一出处：出怪/地标共用）
   camera: { beta: number; radius: number; minRadius: number; maxRadius: number; fov: number; targetZ: number };
   post: { bloomThreshold: number; bloomWeight: number; exposure: number; contrast: number };
@@ -647,8 +648,9 @@ const TUNING: TuningDef = {
   projectileCap: 96,
   swingDuration: 0.34,
   flashDuration: 0.14,
+  unitScale: 1.8,
   laneX: [-7, 0, 7],
-  camera: { beta: 0.58, radius: 90, minRadius: 72, maxRadius: 110, fov: 0.82, targetZ: -2 },
+  camera: { beta: 0.7, radius: 74, minRadius: 56, maxRadius: 92, fov: 0.86, targetZ: -4 },
   post: { bloomThreshold: 0.9, bloomWeight: 0.3, exposure: 0.93, contrast: 1.05 },
 };
 

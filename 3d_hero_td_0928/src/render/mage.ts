@@ -3,6 +3,7 @@
    自 dev/core.js 拆出为 ESM（阶段2 第3步）；数值与行为保持与原文一致。
    ========================================================================== */
 import * as BABYLON from '@babylonjs/core';
+import { CONFIG } from '../core/config';
 import { FX } from './particles';
 
 const V3 = BABYLON.Vector3;
@@ -66,6 +67,7 @@ export class Mage {
     const root = new BABYLON.TransformNode('mage', scene);
     const visual = new BABYLON.TransformNode('mageVisual', scene);
     visual.parent = root;
+    visual.scaling.setAll(CONFIG.TUNING.unitScale);   // 单位放大（阶段3e）
     this.root = root; this.visual = visual;
     this.scene = scene;
 
@@ -205,7 +207,7 @@ export class Mage {
       this.crystals.push(c);
     }
 
-    const pl = new BABYLON.PointLight('mageLight', new V3(0, 2.6, 0.6), scene);
+    const pl = new BABYLON.PointLight('mageLight', new V3(0, 2.6 * CONFIG.TUNING.unitScale, 0.6), scene);
     pl.intensity = 0.16; pl.range = 9;
     pl.diffuse = new C3(0.48, 0.72, 1.0);
     pl.parent = root;

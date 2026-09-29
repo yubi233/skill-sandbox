@@ -349,7 +349,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
     /* 相机目标静置在战场中部；震屏与冲击只做叠加不累积 */
     const cine = game.cinematic;
-    sTarget.set(0, 1.5, -2);
+    sTarget.set(0, 1.5, CONFIG.TUNING.camera.targetZ);
     if (!cine.shakeEnabled) cine.shake = 0;
     if (cine.shake > 0.001) {
       const s = cine.shake * 0.32;

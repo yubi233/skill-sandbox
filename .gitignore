@@ -1,2 +1,6 @@
 dev/qa/
 .DS_Store
+# QA/会话产物（本地产物，不入库）
+.dsh-sessions/
+.dsh-vision-router/
+dev/.qa-profile*/

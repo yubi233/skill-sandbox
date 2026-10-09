@@ -1,6 +1,6 @@
 /* ==========================================================================
    main.js — 输入、瞄准、演示与统一时间步
-   1–9 选择技能，[] 切换等级，空格向前释放，WASD 移动。
+   1–9 / 0 / - 选择技能，[] 切换等级，空格向前释放，WASD 移动。
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -41,8 +41,10 @@
         return;
       }
       if (isEditing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key >= '1' && e.key <= '9') {
-        UI.select(Number(e.key));
+      if ((e.key >= '1' && e.key <= '9') || e.key === '0' || e.key === '-') {
+        /* 上限由注册表派生；UI.select 内部同样会校验。0 = 第 10 个技能，- = 第 11 个 */
+        const num = e.key === '0' ? 10 : e.key === '-' ? 11 : Number(e.key);
+        if (num <= SKILLS.defs.length) UI.select(num);
         e.preventDefault();
         return;
       }
@@ -111,13 +113,8 @@
 
     function cancelCast() {
       game.demoTimer = -1;
-      for (let i = SKILLS.casts.length - 1; i >= 0; i--) {
-        const cast = SKILLS.casts[i];
-        if (cast.phase === 'windup' || cast.phase === 'release') {
-          cast.dispose();
-          SKILLS.casts.splice(i, 1);
-        }
-      }
+      /* 取消规则由技能系统实现：UI/输入层不再直接改写 casts */
+      SKILLS.cancelPendingCasts(game);
       UI.clearSelection();
       game.ring.setVisible(false);
       UI.setPhase('待机');
@@ -126,7 +123,7 @@
 
     function tryCast(point) {
       const id = UI.selectedId;
-      if (!id) { UI.toast('先按 1–9 选择技能'); return false; }
+      if (!id) { UI.toast('先按 1–9 / 0 / - 选择技能'); return false; }
       const def = SKILLS.defs.find(d => d.id === id);
       const profile = SKILLS.profile(game, id);
       if (!def || !profile) return false;
@@ -139,7 +136,7 @@
       }
       game.mage.faceTo(point.x - mp.x, point.z - mp.z);
       const ok = SKILLS.start(game, id, point);
-      if (!ok) UI.toast('法术能量正在释放，请稍候');
+      if (!ok) UI.toast(SKILLS.lastRejectReason === 'error' ? '释放异常，法术已回收 · 请重试' : '法术能量正在释放，请稍候');
       return ok;
     }
 
@@ -190,7 +187,8 @@
 
     game.demoTimer = -1;
     game.demoIndex = 0;
-    const demoOrder = [3, 2, 6, 4, 5, 1, 7, 8, 9];
+    /* 演示顺序由注册表 demoOrder 派生 */
+    const demoOrder = SKILLS.defs.slice().sort((a, b) => a.demoOrder - b.demoOrder).map(d => d.id);
     function updateDemo(dt) {
       if (game.demoTimer < 0) return;
       // 大法术完整收招后再接下一招，避免八种元素叠成白屏。
@@ -214,10 +212,13 @@
       game.frameDt = dt;
       game.moveInput.x = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
       game.moveInput.z = (keys.w ? 1 : 0) - (keys.s ? 1 : 0);
+      /* 显式流水线：时间/移动 → 技能 → 粒子 → 姿态镜头 → UI → 渲染 */
+      game.update(dt);
       updateAim(dt);
       updateDemo(dt);
       SKILLS.update(dt);
       FX.update(dt);
+      game.lateUpdate(dt);
       UI.update(dt);
       if (SKILLS.casts.length === 0 && game.demoTimer < 0) UI.setPhase('待机');
       hudT += dt;
@@ -225,7 +226,7 @@
         hudT = 0;
         UI.setHud(Math.round(game.engine.getFps()), FX.aliveCount());
       }
-      game.scene.render();
+      game.render();
     };
 
     let lastNativeFrame = performance.now();
@@ -252,6 +253,7 @@
       game.engine.beginFrame();
       try { draw(now); } finally { game.engine.endFrame(); }
     }, 33);
+    game.__watchdog = watchdog; /* game.dispose 统一回收 */
     window.addEventListener('pagehide', () => clearInterval(watchdog), { once: true });
     UI.toast('末日陨星已就绪 · 点击释放，或按空格');
   }

@@ -555,10 +555,12 @@
     attribute vec3 position;
     attribute vec2 uv;
     uniform mat4 worldViewProjection;
+    uniform vec2 uUVScale;
+    uniform vec2 uUVOffset;
     varying vec2 vUV;
     void main() {
       gl_Position = worldViewProjection * vec4(position, 1.0);
-      vUV = uv;
+      vUV = uv * uUVScale + uUVOffset;
     }`;
   const SPRITE_FS = `
     precision highp float;
@@ -578,12 +580,15 @@
     mesh.isPickable = false;
     const mat = new BABYLON.ShaderMaterial('sprMat_' + name, scene, { vertex: 'fxSprite', fragment: 'fxSprite' }, {
       attributes: ['position', 'uv'],
-      uniforms: ['worldViewProjection', 'uColor', 'meshAlpha'],
+      uniforms: ['worldViewProjection', 'uColor', 'meshAlpha', 'uUVScale', 'uUVOffset'],
       samplers: ['diffuseSampler'],
     });
     mat.setTexture('diffuseSampler', texture);
     mat.setColor4('uColor', color || new BABYLON.Color4(1, 1, 1, 1));
     mat.setFloat('meshAlpha', 1);
+    /* 序列帧翻页：uv = uv * uUVScale + uUVOffset；默认恒等变换 */
+    mat.setVector2('uUVScale', new BABYLON.Vector2(1, 1));
+    mat.setVector2('uUVOffset', new BABYLON.Vector2(0, 0));
     mat.onBindObservable.add(() => mat.setFloat('meshAlpha', mesh.visibility));
     mat.disableDepthWrite = true;
     mat.backFaceCulling = false;
@@ -715,7 +720,7 @@
       for (const k in this.layers) this.layers[k].setPointScale(v);
     },
     update(dt) {
-      this.time += dt;
+      /* 时钟唯一写入点是 game.update（主流水线），此处不再自增全局时间 */
       for (const k in this.layers) this.layers[k].update(dt, this.time);
     },
     aliveCount() {

@@ -98,6 +98,7 @@
     color: var(--cyan); font-size: 9px; letter-spacing: 1.1px;
   }
   #skill-badge.ultimate { color: #dbc391; border-color: rgba(200, 173, 119, .42); background: rgba(200, 173, 119, .06); }
+  .element-chip { border: 1px solid var(--line-bright); border-radius: 2px; padding: 3px 7px; color: var(--muted); font-size: 9px; letter-spacing: 1px; }
   #hud-skill { font-size: clamp(23px, 2.1vw, 31px); line-height: 1.4; font-weight: 500; letter-spacing: 2px; overflow-wrap: anywhere; text-wrap: balance; }
   #skill-origin { margin-top: 8px; font-size: 11px; color: var(--gold); letter-spacing: 1.3px; }
   #skill-brief { margin-top: 17px; max-width: 258px; color: #94a4a7; font-size: 11px; line-height: 1.95; letter-spacing: .6px; }
@@ -148,7 +149,7 @@
   #cast-label { font-size: 13px; font-weight: 600; letter-spacing: 2px; }
   #cast-meta { font-size: 9px; font-variant-numeric: tabular-nums; letter-spacing: 1px; white-space: nowrap; }
   .cast-hint { margin-top: 6px; text-align: center; color: var(--quiet); font-size: 9px; letter-spacing: .4px; }
-  #skillbar { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 7px; }
+  #skillbar { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 7px; }
   .slot {
     min-width: 0; height: 91px; padding: 6px 5px 7px; position: relative; overflow: hidden;
     border: 1px solid var(--line); border-radius: 4px; background: rgba(255, 255, 255, .018);
@@ -165,6 +166,7 @@
   .slot .nm { width: 100%; margin-top: 3px; font-size: 10px; color: #bfcac9; letter-spacing: .6px; text-align: center; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; position: relative; z-index: 2; }
   .slot.sel .nm { color: #e6d7b9; }
   .slot .slot-status { position: relative; z-index: 2; margin-top: 4px; color: var(--quiet); font-size: 8px; line-height: 10px; letter-spacing: .9px; font-variant-numeric: tabular-nums; }
+  .slot .slot-element { position: absolute; right: 6px; bottom: 8px; z-index: 2; font-size: 8px; line-height: 10px; letter-spacing: .8px; opacity: .95; }
   .slot.cooling .slot-status { color: var(--gold); }
   .slot .cd { position: absolute; inset: 0; pointer-events: none; background: rgba(3, 7, 10, .58); transform-origin: bottom; transform: scaleY(0); z-index: 1; }
   .dock-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; min-height: 21px; }
@@ -399,11 +401,12 @@
     <nav class="mast-actions" aria-label="试炼场操作">
       <button type="button" class="quiet-btn" id="btn-demo" aria-pressed="false"><span class="demo-symbol" aria-hidden="true"></span><span id="demo-label">自动演示</span></button>
       <button type="button" class="quiet-btn" id="help-toggle" aria-controls="help-card" aria-expanded="false">操作说明</button>
+      <button type="button" class="quiet-btn" id="btn-cam-copy" title="复制当前镜头参数（JSON）">复制镜头</button>
     </nav>
   </header>
 
   <section id="brief-card" aria-label="当前技能">
-    <div class="brief-heading"><span id="skill-index">SPELL / 03</span><span id="skill-badge" class="ultimate">LV.5 · 灾厄</span></div>
+    <div class="brief-heading"><span id="skill-index">SPELL / 03</span><span id="skill-badge" class="ultimate">LV.5 · 灾厄</span><span id="skill-element" class="element-chip" hidden></span></div>
     <h2 id="hud-skill">陨火天降</h2>
     <p id="skill-origin">第五阶 · 大法术</p>
     <p id="skill-brief">让陨火划破夜空，在选定落点引发毁灭性的爆发。</p>
@@ -436,9 +439,9 @@
         <p class="cast-hint">按钮向前方安全落点释放 · 鼠标可自由瞄准</p>
       </div>
     </div>
-    <div id="skillbar" role="group" aria-label="九种技能，数字键 1 到 9 选择"></div>
+    <div id="skillbar" role="group" aria-label="十一种技能，数字键 1 到 9、0 与 - 选择"></div>
     <div class="dock-foot">
-      <span class="deck-label">ELEMENTAL ARSENAL / 09</span>
+      <span class="deck-label">ELEMENTAL ARSENAL / 11</span>
       <div class="key-hints" aria-label="快捷操作">
         <span><kbd>1–9</kbd> 技能</span><span><kbd>WASD</kbd> 移动</span><span><kbd>鼠标左键</kbd> 释放</span><span><kbd>ESC / 右键</kbd> 取消</span><span class="optional-hint"><kbd>滚轮</kbd> 缩放</span>
       </div>
@@ -461,7 +464,7 @@
 
   <section id="help-card" class="glass" aria-label="操作说明" hidden>
     <h2>驾驭九种秘仪</h2>
-    <div class="row"><kbd class="k">1 – 8</kbd><span class="d">切换技能，不是法术等级</span></div>
+    <div class="row"><kbd class="k">1 – 9</kbd><span class="d">切换技能，不是法术等级</span></div>
     <div class="row"><kbd class="k">[ / ]</kbd><span class="d">切换 LV.1–5，五阶解锁大法术</span></div>
     <div class="row"><kbd class="k">W A S D</kbd><span class="d">移动施法者</span></div>
     <div class="row"><kbd class="k">鼠标左键</kbd><span class="d">向鼠标所指位置释放技能</span></div>

@@ -110,6 +110,30 @@
         ctx.lineWidth = 3.2;
         ctx.beginPath(); ctx.moveTo(-9, -9); ctx.lineTo(9, -9); ctx.stroke();
         break;
+      case 10: /* 魔弹连射:三连扇形弹幕 */
+        for (let i = -1; i <= 1; i++) {
+          ctx.save();
+          ctx.translate(i * 10, 3);
+          ctx.rotate(i * 0.38);
+          ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, 10); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, -21); ctx.lineTo(-5, -12); ctx.lineTo(5, -12); ctx.closePath(); ctx.fill();
+          ctx.lineWidth = 2.4;
+          ctx.beginPath(); ctx.moveTo(-4, 14); ctx.lineTo(0, 20); ctx.lineTo(4, 14); ctx.stroke();
+          ctx.restore();
+        }
+        break;
+      case 11: /* 怒涛裂岸:卷浪 + 漩涡 */
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        ctx.moveTo(-15, 20);
+        ctx.quadraticCurveTo(-19, 0, -4, -6);
+        ctx.quadraticCurveTo(6, -10, 8, -20);
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(9, -12, 7, Math.PI * 0.85, Math.PI * 1.9); ctx.stroke();
+        ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.ellipse(-2, 15, 14, 5, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(-2, 15, 7, 2.5, 0, 0, Math.PI * 2); ctx.stroke();
+        break;
     }
     ctx.restore();
   }
@@ -259,7 +283,7 @@
       document.getElementById('btn-reset').addEventListener('click', () => {
         SKILLS.abortAll(); game.demoTimer = -1;
         game.timeScale = 1; this.setPhase('待机');
-        for (const key in SKILLS.cooldowns) SKILLS.cooldowns[key] = 0;
+        SKILLS.clearCooldowns();
         const merge = (target, fresh) => {
           for (const key in fresh) {
             if (fresh[key] && typeof fresh[key] === 'object') merge(target[key] || (target[key] = {}), fresh[key]);
@@ -276,6 +300,27 @@
         if (game.demoTimer >= 0) game.demoIndex = 0;
         toast(game.demoTimer >= 0 ? '自动演示 · 按各技能已选等级，完整播放后切换' : '演示已停止');
       });
+      document.getElementById('btn-cam-copy').addEventListener('click', () => {
+        const cam = game.camera;
+        const r = (v) => Math.round(v * 1000) / 1000;
+        const data = {
+          alpha: r(cam.alpha), beta: r(cam.beta), radius: r(cam.radius), fov: r(cam.fov),
+          target: [r(cam.target.x), r(cam.target.y), r(cam.target.z)],
+          position: [r(cam.position.x), r(cam.position.y), r(cam.position.z)],
+        };
+        const text = JSON.stringify(data);
+        const done = () => toast('镜头数据已复制 · ' + text);
+        const fallback = () => {
+          const ta = document.createElement('textarea');
+          ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败 · ' + text); }
+          ta.remove();
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, fallback);
+        } else fallback();
+      });
       this.select(3);
       new ResizeObserver(resize).observe(document.getElementById('spell-dock'));
       window.addEventListener('resize', resize);
@@ -286,10 +331,16 @@
       const bar = document.getElementById('skillbar');
       bar.innerHTML = '';
       this.slots = [];
-      for (const def of SKILLS.defs) {
+      /* 按元素分组展示（火/冰/雷/水/土/风/圣/暗），快捷键仍绑定技能 id */
+      const ordered = SKILLS.defs.slice().sort((a, b) => (a.elementOrder - b.elementOrder) || (a.id - b.id));
+      for (const def of ordered) {
+        const element = SKILLS.elementOf(def.element);
         const slot = document.createElement('button');
         slot.type = 'button';
         slot.setAttribute('aria-label', def.hotkey + ' · ' + def.name);
+        slot.title = (element ? element.name + ' · ' : '') + def.name;
+        slot.dataset.element = def.element;
+        if (element) slot.style.setProperty('--element-color', element.color);
         slot.className = 'slot';
         slot.dataset.id = def.id;
         const img = document.createElement('img');
@@ -306,6 +357,12 @@
         nm.className = 'nm';
         nm.textContent = def.name;
         slot.appendChild(nm);
+        /* 元素标记：名牌上方的单字（火/冰/雷/水/土/风/圣/暗） */
+        const el = document.createElement('div');
+        el.className = 'slot-element';
+        el.textContent = element ? element.name : '';
+        if (element) el.style.color = element.color;
+        slot.appendChild(el);
         slot.addEventListener('click', () => this.select(def.id));
         bar.appendChild(slot);
         slot.appendChild(status);
@@ -414,23 +471,25 @@
     refreshBrief() {
       const p = SKILLS.profile(this.game, this.selectedId);
       if (!p) return;
-      const descriptions = {
-        1: '悬空冰枪依次坠落，冻结的碎晶在地表绽放成锋利王冠。',
-        2: '高空法印唤下审判巨剑，分支雷霆撕开落点周围的大地。',
-        3: '熔岩陨星携碎星坠落，冲击波掀起岩板，留下炽热的地裂。',
-        4: '层叠星环校准天穹炮口，收束的星能贯穿地面，释放环形余波。',
-        5: '黑曜立柱围出雷狱，交错电弧封锁穹顶，核心最终向外崩解。',
-        6: '寒潮层层向外推进，冰晶从地脉生长，重塑整片战场。',
-        7: '化作疾风穿越战场，留下裹挟碎石的螺旋风壁与巨型龙卷。',
-        8: '大地沿施法方向开裂，巨石与山脊依次隆起，掀起漫天尘土。',
-      };
+      /* 高阶描述来自 skill-catalog（唯一来源），UI 不再维护副本 */
       const put = (id, value) => { document.getElementById(id).textContent = value; };
       put('hud-skill', p.level === 5 ? p.ultimateName : p.name);
       put('skill-index', 'SPELL / ' + String(this.selectedId).padStart(2, '0'));
       put('skill-badge', 'LV.' + p.level + ' · ' + p.levelName);
       document.getElementById('skill-badge').classList.toggle('ultimate', p.level === 5);
       put('skill-origin', p.level === 5 ? p.name + ' / 禁忌大法术' : '第 ' + p.level + ' 阶 · ' + p.levelName);
-      put('skill-brief', p.level >= 4 ? descriptions[this.selectedId] : SKILLS.LEVELS[p.level - 1].description);
+      const def = SKILLS.defs.find(d => d.id === this.selectedId);
+      put('skill-brief', p.level >= 4 ? def.description : SKILLS.LEVELS[p.level - 1].description);
+      /* 系别徽标（洛克世界 18 系） */
+      const elementMeta = SKILLS.elementOf(def.element);
+      const chip = document.getElementById('skill-element');
+      if (chip && elementMeta) {
+        chip.hidden = false;
+        chip.textContent = elementMeta.name + '系';
+        chip.title = elementMeta.key.toUpperCase();
+        chip.style.color = elementMeta.color;
+        chip.style.borderColor = elementMeta.color;
+      }
       put('skill-range', p.range.toFixed(0) + ' m'); put('skill-windup', p.windup.toFixed(2) + ' s'); put('skill-cooldown', p.cooldown.toFixed(2) + ' s');
       put('level-description', p.levelName + ' · 本级参数独立保存');
       put('cast-label', p.level === 5 ? '释放大法术' : '释放技能');
@@ -444,8 +503,10 @@
     clearSelection() {
       this.selectedId = 0;
       for (const s of this.slots) { s.slot.classList.remove('sel'); s.slot.setAttribute('aria-pressed', 'false'); }
+      const chip = document.getElementById('skill-element');
+      if (chip) chip.hidden = true;
       document.getElementById('hud-skill').textContent = '选择你的法术';
-      document.getElementById('skill-origin').textContent = '按 1–9 或点击技能卡';
+      document.getElementById('skill-origin').textContent = '按 1–9 / 0 / - 或点击技能卡';
       document.getElementById('skill-brief').textContent = '已释放的法术将继续完成。';
       document.getElementById('cast-label').textContent = '选择技能';
     },
@@ -468,7 +529,7 @@
       const disabled = !this.selectedId || left > 0;
       const castBtn = document.getElementById('btn-cast');
       if (castBtn.disabled !== disabled) castBtn.disabled = disabled;
-      const meta = !this.selectedId ? '1–9 / 选择' : left > 0 ? left.toFixed(1) + ' s / 恢复中' : 'LV.' + this.game.params.skills[this.selectedId].level + ' / SPACE';
+      const meta = !this.selectedId ? '1–9 / 0 / - / 选择' : left > 0 ? left.toFixed(1) + ' s / 恢复中' : 'LV.' + this.game.params.skills[this.selectedId].level + ' / SPACE';
       if (meta !== this._meta) { document.getElementById('cast-meta').textContent = meta; this._meta = meta; }
       const demo = this.game.demoTimer >= 0;
       if (demo !== this._demo) {
@@ -478,9 +539,10 @@
       }
       const cast = SKILLS.poseOwner(this.game), phases = ['windup', 'release', 'travel', 'impact', 'aftermath'];
       const index = cast ? phases.indexOf(cast.phase) : -1;
-      if (index !== this._phaseIdx || (cast && cast._uiLv !== cast.level + '_' + cast.def.id)) {
-        this._phaseIdx = index;
-        if (cast) cast._uiLv = cast.level + '_' + cast.def.id;
+      /* 脏检查键由 UI 自持，不再向技能实例写缓存字段 */
+      const phaseKey = cast ? cast.level + '|' + cast.def.id + '|' + index : '-';
+      if (phaseKey !== this._phaseKey) {
+        this._phaseKey = phaseKey;
         document.querySelectorAll('.phase-step').forEach((node, i) => {
           node.classList.toggle('active', i === index); node.classList.toggle('done', i < index);
         });

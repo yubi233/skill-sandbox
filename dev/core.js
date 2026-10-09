@@ -55,22 +55,17 @@
         fxaa: true,
       },
       camera: {
-        distance: 19.5,
-        beta: 0.80,
-        fov: 0.74,
+        alpha: -2.658,
+        distance: 39.65,
+        beta: 1.034,
+        fov: 0.741,
         smooth: 0.12,
       },
-      skills: {
-        1: { color: '#79d2ff', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-        2: { color: '#c9a6ff', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-        3: { color: '#ff9440', count: 1, speed: 1, size: 1, period: 1, level: 5, tiers: mkTiers() },
-        4: { color: '#8fe0ff', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-        5: { color: '#7b6bff', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-        6: { color: '#7ff0e6', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-        7: { color: '#86ffd0', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-        8: { color: '#e0a86a', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-        9: { color: '#ffcf6b', count: 1, speed: 1, size: 1, period: 1, level: 3, tiers: mkTiers() },
-      },
+      /* 技能默认参数由 skill-catalog.js 唯一派生，core 不再手工维护接线点 */
+      skills: SKILL_CATALOG.reduce((map, def) => {
+        map[def.id] = { color: def.color, count: 1, speed: 1, size: 1, period: 1, level: def.level, tiers: mkTiers() };
+        return map;
+      }, {}),
     };
   }
 
@@ -104,6 +99,8 @@
       matTrim.emissiveColor = new C3(0.10, 0.55, 0.95);
       matTrim.specularColor = new C3(0, 0, 0);
       this.matTrim = matTrim;
+      /* Mage 独占的材质：dispose 时随角色一起释放 */
+      this._ownMaterials = [matArmor, matCloth, matGold, matTrim];
 
       /* 躯干 + 长袍 + 纹章 */
       const torso = BABYLON.MeshBuilder.CreateCapsule('torso', { height: 1.42, radius: 0.40, tessellation: 16 }, scene);
@@ -384,9 +381,16 @@
     }
 
     dispose() {
+      /* 先关边缘渲染再销毁：edgesRenderer 的 lineShader 材质随角色一起回收 */
+      if (this.gem) this.gem.disableEdgesRendering();
       this.root.getChildMeshes().forEach(m => m.dispose());
       this.visual.dispose();
       this.root.dispose();
+      const alive = (mat) => (typeof mat.isDisposed === 'function' ? !mat.isDisposed() : true);
+      for (const mat of this._ownMaterials) if (alive(mat)) mat.dispose();
+      for (const mat of this.scene.materials.slice()) {
+        if (mat.name === 'lineShader' && alive(mat)) mat.dispose();
+      }
     }
   }
 
@@ -544,8 +548,8 @@
 
     const mage = new Mage(scene);
 
-    /* 相机:第三人称 45° 俯视跟随,略带侧角 */
-    const camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2 + 0.34, params.camera.beta, params.camera.distance, new V3(0, 1.4, 0), scene);
+    /* 相机:初始视角为玩家标定的 alpha/beta/距离/视场,目标点跟随出生在原点的法师 */
+    const camera = new BABYLON.ArcRotateCamera('cam', params.camera.alpha, params.camera.beta, params.camera.distance, new V3(0, 1.4, 0), scene);
     camera.lowerRadiusLimit = 9;
     camera.upperRadiusLimit = 80;
     camera.lowerBetaLimit = 0.30;
@@ -624,30 +628,15 @@
       },
     };
 
-    /* 每帧:相机跟随 + 电影化叠加 + 悬浮石 + 粒子点尺寸 */
+    /* —— 模拟推进：主循环唯一时间源（main.js game.tick 显式调用，不再藏在渲染回调里） —— */
     let camPos = camera.target.clone();
     /* 逐帧复用的临时向量:相机/移动热路径零分配,避免每帧 GC 压力 */
     const sFwd = new V3(), sRight = new V3(), sDir = new V3(), sTmp = new V3(), sBase = new V3(), sTarget = new V3();
     let fpsEma = 60, resTimer = 0;
-    scene.onBeforeRenderObservable.add(() => {
-      const dt = Number.isFinite(game.frameDt) ? game.frameDt : Math.min(engine.getDeltaTime() / 1000, 0.05);
+    game.update = function (dt) {
+      if (!Number.isFinite(dt) || dt < 0) dt = 0;
       game.time += dt;
       FX.time = game.time;
-
-      /* 动态分辨率:仅在持续低于 45fps 时降低渲染比例兜底,恢复后逐步回升。
-         本机不触发;UI 是 DOM 层不受影响,探针场景(dt 固定)也不会误触发。 */
-      fpsEma = fpsEma * 0.96 + (dt > 1e-5 ? 1 / dt : 60) * 0.04;
-      resTimer += dt;
-      if (resTimer >= 1) {
-        resTimer = 0;
-        if (fpsEma < 45 && hwLevel < hwMax) {
-          hwLevel = Math.min(hwMax, hwLevel + 0.18);
-          engine.setHardwareScalingLevel(hwLevel);
-        } else if (fpsEma > 57 && hwLevel > hwBest) {
-          hwLevel = Math.max(hwBest, hwLevel - 0.12);
-          engine.setHardwareScalingLevel(hwLevel);
-        }
-      }
 
       const mv = game.moveInput;
       const len = Math.hypot(mv.x, mv.z);
@@ -669,6 +658,13 @@
           moving = true;
         }
       }
+      game._moving = moving;
+    };
+
+    /* —— 姿态/镜头/装饰：在技能与粒子更新之后、渲染之前执行 —— */
+    game.lateUpdate = function (dt) {
+      if (!Number.isFinite(dt) || dt < 0) dt = 0;
+      const moving = !!game._moving;
 
       /* 基础跟随:角色略偏后,让前方落点进入画面 */
       const fx = Math.sin(mage.facing), fz = Math.cos(mage.facing);
@@ -709,9 +705,44 @@
 
       const halfH = engine.getRenderHeight() * 0.5;
       FX.setPointScale(halfH / Math.max(0.2, Math.tan(camera.fov * 0.5)));
-    });
+    };
 
-    window.addEventListener('resize', () => engine.resize());
+    game.render = function () {
+      /* 动态分辨率按真实帧间隔评估,不受模拟时间倍率影响 */
+      const realDt = Math.min(engine.getDeltaTime() / 1000, 0.05);
+      fpsEma = fpsEma * 0.96 + (realDt > 1e-5 ? 1 / realDt : 60) * 0.04;
+      resTimer += realDt;
+      if (resTimer >= 1) {
+        resTimer = 0;
+        /* 动态分辨率:仅在持续低于 45fps 时降低渲染比例兜底,恢复后逐步回升 */
+        if (fpsEma < 45 && hwLevel < hwMax) {
+          hwLevel = Math.min(hwMax, hwLevel + 0.18);
+          engine.setHardwareScalingLevel(hwLevel);
+        } else if (fpsEma > 57 && hwLevel > hwBest) {
+          hwLevel = Math.max(hwBest, hwLevel - 0.12);
+          engine.setHardwareScalingLevel(hwLevel);
+        }
+      }
+      scene.render();
+    };
+
+    /* —— 统一销毁：渲染循环/监听/技能/场景/引擎，幂等 —— */
+    const onWindowResize = () => engine.resize();
+    window.addEventListener('resize', onWindowResize);
+    let disposed = false;
+    game.dispose = function () {
+      if (disposed) return;
+      disposed = true;
+      engine.stopRenderLoop();
+      if (game.__watchdog) { clearInterval(game.__watchdog); game.__watchdog = null; }
+      if (global.SKILLS) {
+        SKILLS.abortAll();
+        if (SKILLS._game === game) SKILLS._game = null;
+      }
+      window.removeEventListener('resize', onWindowResize);
+      scene.dispose();
+      engine.dispose();
+    };
 
     return game;
   }
